@@ -1,0 +1,1994 @@
+--[[
+Azeroth Unrolled - one continuous camera over the whole world map.
+
+Scroll from the Azeroth map straight down into a zone and past it (e.g. onto
+the Deadmines entrance), drag across zone borders, no map-switch jumps.
+
+How it stays friendly with Questie and other map addons:
+  * We draw the map art ourselves (world, continents and zones blended by
+    zoom) on an overlay that sits inside Blizzard's map canvas, just
+    *underneath* the pin layers, so Questie's icons, Blizzard's POIs and the
+    player arrow always draw on top of our art.
+  * We keep Blizzard's own map pointed at exactly our view with its public
+    methods (SetMapID + ScrollContainer:InstantPanAndZoom): at rest, and
+    also every frame while you scroll, drag or fly - the way Blizzard's own
+    zoom animation updates its canvas every frame - so the pins move with
+    the map instead of vanishing until it stops. The map it shows is one
+    that can display exactly our view (switching like Blizzard's map does
+    when you navigate); only where no map can (or in combat, where we never
+    switch maps) is Blizzard's canvas hidden until the view settles.
+  * No Blizzard tables are replaced or written to; we only use
+    hooksecurefunc / HookScript and Blizzard's own methods.
+  * (3.3.1) Those methods run under our taint, though: a map switch we make
+    refreshes Blizzard's quest pins, which fill the quest cache the objective
+    tracker reads. We only switch to maps whose quests Blizzard has cached
+    itself (QuestSafe) - the tracker stays clean.
+]]
+
+local ADDON, ns = ...
+
+local DEFAULTS = {
+    enabled = true,
+    maxZoom = 4,         -- how far past a zone's normal size you can zoom in
+    zoomStep = 1.3,      -- zoom factor per mouse-wheel notch
+    labels = true,       -- show important places
+    labelsAtRest = true, -- keep them on the map when it isn't moving
+    flightPaths = true,
+    mosaic = true,       -- zone land shapes in their map style (see Render.lua)
+    cells = true,        -- ...cut by zone-cell masks (off: by explored-area shapes)
+    livePins = true,     -- map icons move with the map (off: hidden until it stops)
+    flySpeed = 1,        -- speed multiplier for click flights
+    dungeons = true,     -- dungeon maps (Dungeon.lua, WoW Forever)
+    engineMarkers = true, -- group on entrance maps drawn by the game's own widget (DungeonMarkers.lua; off: addon dots)
+    bosses = true,       -- (2.11.0) boss and entrance markers on dungeon maps (DungeonBosses.lua)
+    doorHints = true,    -- (3.0.0) placeholder icons for the instances not in the game files yet (Doors.lua)
+    zoomReadout = false, -- (3.0.1) /unroll zoom: the zoom numbers on the map (ZoomReadout.lua)
+    cityZoom = ns.Render.CITY_G, -- (3.1.0) WORLD zoom from which every city / detail map shows (/unroll cityzoom; false: 1.5x of their zone)
+    follow = true,       -- (3.3.0) a click on your arrow / a party member's dot follows them (Follow.lua; /unroll follow)
+    openZoom = 14,       -- (3.3.0) M opens the map on your character at this WORLD zoom (false: as the game does)
+    openFollow = true,   -- (3.4.0) ...and follows you (Follow.lua; /unroll openfollow)
+    caveZoom = ns.Render.CAVE_G, -- (3.4.0) WORLD zoom from which the caves show (Caves.lua; /unroll cavezoom; false: never)
+}
+
+local IDLE_DELAY = 0.2      -- seconds without input before handing over
+local ZOOM_RATE = 14        -- how quickly the zoom catches up to the wheel
+local MOMENTUM_DECAY = 5
+local RELEASE_DELAY = 10    -- free texture memory this long after closing
+local LIVE_SWITCH_DELAY = 0.15 -- mid-motion, a better real map takes over once preferred this long
+local FOLLOW_RATE = 6          -- (3.3.0) how quickly the camera catches up with the unit it follows (Follow.lua)
+local FOLLOW_ZONE_CHECK = 0.5  -- (3.3.0) how often a followed view on a continent map looks for a zone map again
+
+-- Absolute frame levels. Map pins live at 2000-9000 (Questie icons 2015+).
+-- (only while Blizzard's canvas can't follow the view, see SyncMoving)
+local OVERLAY_LEVEL_MOVING = 9100 -- above every pin while we drive the view
+local LABELS_LEVEL_MOVING = 9400
+local CATCHER_LEVEL = 9100         -- takes the mouse while the map moves
+-- At rest our art lives in a band just below every map pin (pins start at
+-- 2000) and above Blizzard's own map tiles. The only Blizzard art drawn over
+-- it is the current map's explored areas, which match ours pixel for pixel -
+-- except where we draw a more detailed picture over that map (a city inside
+-- its zone): those pictures go just above the explored areas (liftLo..liftHi).
+local REST_BAND = 40
+local REST_LEVEL_FALLBACK = 2000 - REST_BAND - 1
+local LABELS_LEVEL_REST_FALLBACK = 2014  -- above highlights, below Questie (2015+)
+
+local WHEEL_NONE = MAP_CANVAS_MOUSE_WHEEL_ZOOM_BEHAVIOR_NONE or 3
+
+local db
+local container, overlay, labelLayer, cityLayer, driver, catcher
+local ready = false
+local fourArgPanZoom = false
+local blizzWheelMode, wheelIsOurs
+local restLevel = REST_LEVEL_FALLBACK
+local restStageCap = REST_LEVEL_FALLBACK + REST_BAND
+local labelsRestLevel = LABELS_LEVEL_REST_FALLBACK
+local liftLo, liftHi -- levels just above Blizzard's exploration pin (Render:SetRestLift)
+local cityLevel      -- (3.1.1) the city layer's level at rest: above Blizzard's map art pins (see Setup)
+local cityLevelZone  -- (3.1.2) the same over a zone map: just above its explored areas (see SetOverlayMode)
+local translucent = false
+local dragThreshold = 4
+
+local v = { W = 0, H = 0, lw0 = 1, lh0 = 1, fit0 = 1 } -- view metrics
+local cam = { x = 0.5, y = 0.5, vw = 1 }                 -- world-normalized camera
+local state = "off"      -- off | rest | free | fly | hold
+local targetVw = 1
+local anchor             -- wheel zoom anchor { wx, wy, sx, sy, ax, ay, asx, asy } (the aim: see CityZoom)
+local restAim            -- the last wheel anchor when a rest cut it off: a slow, notch-by-notch zoom
+                         -- into a city keeps aiming at the spot first pointed at (see OnMouseWheel)
+local drag = { pending = false, active = false, swallow = false }
+local vel = { x = 0, y = 0 }                             -- screen units / second
+local lastInput = 0
+local fly
+local syncing = false
+local justShown = false
+local realDirty = false
+local restBusy = false
+local focusCheckT = 0
+local hideGen = 0
+-- Live motion: Blizzard's canvas (and its pins) follows the camera while
+-- moving. live = it is in sync this frame; liveS/P/Q = the view we gave it;
+-- liveT = GetTime() of the last sync; livePrefID/T = a better map waiting
+-- to take over (hysteresis).
+local live = false
+local liveS, liveP, liveQ, liveT
+local livePrefID, livePrefT = nil, 0
+local lastWheel = 0 -- (3.1.0) GetTime() of the last wheel notch (LiveMap)
+
+local Render, Labels
+
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+local function UpdateView()
+    local world = ns.maps[ns.WORLD_MAP_ID]
+    local w, h = container:GetSize()
+    if not world or not w or w <= 0 or not h or h <= 0 then return false end
+    v.W, v.H = w, h
+    v.lw0, v.lh0 = world.lw, world.lh
+    v.fit0 = math.min(w / world.lw, h / world.lh)
+    return true
+end
+
+-- Cursor in container units, origin top-left, y down.
+local function CursorPos()
+    local x, y = GetCursorPosition()
+    local s = container:GetEffectiveScale()
+    local left, top = container:GetLeft(), container:GetTop()
+    if not left or not top or not s or s == 0 then return v.W / 2, v.H / 2 end
+    return x / s - left, top - y / s
+end
+
+local function ScreenToWorldWith(c, sx, sy)
+    local ppx, ppy = ns.PixelsPerUnit(v, c.vw)
+    return c.x + (sx - v.W / 2) / ppx, c.y + (sy - v.H / 2) / ppy
+end
+
+-- The camera may only go where a real map can show exactly that view: the
+-- Azeroth map, or a continent once zoomed in to at least its own fit (a
+-- continent's map reaches past the Azeroth art). Returns the nearest such
+-- centre for c, so the settle never has to move the camera.
+-- The map that currently bounds the camera sticks until another one can show
+-- the view without any correction (or it stops qualifying), so the allowed
+-- area never flips back and forth under your hand.
+-- Past a capital's own zone depth the view is also kept on the city (Confine,
+-- defined with the capital helpers below).
+local lastHolderID
+local Confine
+local function NearestHoldable(c)
+    local ppx, ppy = ns.PixelsPerUnit(v, c.vw)
+    local bx, by, bd, bid      -- nearest overall
+    local zx, zy, zid          -- one that needs no correction
+    local sx, sy, sd           -- the sticky one
+    local function try(M)
+        if not M or ns.ZoomOf(v, M, c.vw) < 1 - 1e-4 then return end
+        local s = (M.x1 - M.x0) * ppx / M.lw
+        local xOff = math.min((v.W / 2) / (s * M.lw), 0.5)
+        local yOff = math.min((v.H / 2) / (s * M.lh), 0.5)
+        local wM, hM = M.x1 - M.x0, M.y1 - M.y0
+        local x = ns.Clamp(c.x, M.x0 + xOff * wM, M.x1 - xOff * wM)
+        local y = ns.Clamp(c.y, M.y0 + yOff * hM, M.y1 - yOff * hM)
+        local d = math.sqrt(((x - c.x) * ppx) ^ 2 + ((y - c.y) * ppy) ^ 2)
+        if M.id == lastHolderID then sx, sy, sd = x, y, d end
+        if d < 0.5 and not zid then zx, zy, zid = x, y, M.id end
+        if not bd or d < bd then bx, by, bd, bid = x, y, d, M.id end
+    end
+    try(ns.maps[ns.WORLD_MAP_ID])
+    for _, e in ipairs(ns.drawList) do
+        if e.mapType == ns.MAPTYPE_CONTINENT then try(e) end
+    end
+
+    local x, y, id
+    if sd and sd < 0.5 then x, y, id = sx, sy, lastHolderID
+    elseif zid then x, y, id = zx, zy, zid
+    elseif sd then x, y, id = sx, sy, lastHolderID
+    else x, y, id = bx, by, bid end
+    local changed = lastHolderID ~= nil and id ~= lastHolderID
+    lastHolderID = id
+    x, y = Confine(c, x or c.x, y or c.y)
+    return x, y, changed
+end
+
+-- Clamp camera c. While zooming, or when the bounding map just changed, the
+-- correction glides (capped per frame) from what was on screen, instead of
+-- jumping; otherwise it's a hard edge (e.g. dragging against the map's end).
+local MAX_GLIDE_PX = 16
+local gliding = false
+local function Limit(cur, prev, t)
+    local o, po = cur - t, prev - t
+    if o > 0 then return t + math.min(o, math.max(po, 0)) end
+    if o < 0 then return t + math.max(o, math.min(po, 0)) end
+    return cur
+end
+local function ClampCam(c, dt, zooming, prevX, prevY, panning)
+    if c.vw > 1 then c.vw = 1 end
+    local x, y, changed = NearestHoldable(c)
+    if changed then gliding = true end
+    if not (gliding or zooming) or not dt then
+        c.x, c.y = x, y
+        gliding = false
+        return x, y
+    end
+    if panning and prevX then
+        -- A drag or fling never pushes the camera further past the edge; an
+        -- overshoot that's already there (from a zoom) still glides back.
+        c.x, c.y = Limit(c.x, prevX, x), Limit(c.y, prevY, y)
+    end
+    local baseX, baseY = c.x, c.y
+    if gliding and not zooming and prevX then baseX, baseY = prevX, prevY end
+    local ppx, ppy = ns.PixelsPerUnit(v, c.vw)
+    local dx, dy = (x - baseX) * ppx, (y - baseY) * ppy
+    local d = math.sqrt(dx * dx + dy * dy)
+    if d < 0.02 then
+        c.x, c.y = x, y
+        gliding = false
+    else
+        local step = math.min(d, MAX_GLIDE_PX, math.max(d * (1 - math.exp(-dt * 10)), 0.3))
+        c.x = baseX + (x - baseX) * step / d
+        c.y = baseY + (y - baseY) * step / d
+        -- Keep gliding (even once the zoom has finished) until we arrive.
+        gliding = d - step >= 0.02
+    end
+    return x, y
+end
+
+-- Deepest map at a point: its size decides how far the wheel may zoom there (Util.lua; 3.6.0: also the caves' switch).
+local DeepestAt = ns.DeepestMapAt
+
+local function Usable()
+    return ready and db.enabled and state ~= "off" and WorldMapFrame:IsShown() and v.W > 0
+end
+
+local function MouseFocus()
+    if GetMouseFoci then
+        local foci = GetMouseFoci()
+        return foci and foci[1]
+    elseif GetMouseFocus then
+        return GetMouseFocus()
+    end
+end
+
+local function SetBlizzardWheel(ours)
+    if not WorldMapFrame.SetMouseWheelZoomMode or wheelIsOurs == ours then return end
+    wheelIsOurs = ours
+    WorldMapFrame:SetMouseWheelZoomMode(ours and WHEEL_NONE or blizzWheelMode)
+end
+
+-- While moving with a canvas that can't follow the view (see SyncMoving),
+-- Blizzard's (stale) canvas and pins are hidden, so gaps show the map's
+-- normal background just like at rest - once our own picture is complete
+-- (after a cold start its art may still be loading; until then the canvas
+-- stays). At rest, and while it follows the view, the canvas is aligned
+-- and shows through gaps.
+local overlayMoving = false
+local function UpdateCanvasAlpha()
+    local child = container.Child
+    if not child then return end
+    local want = (overlayMoving and overlay:IsShown() and Render:IsReady()) and 0 or 1
+    if child:GetAlpha() ~= want then child:SetAlpha(want) end
+end
+
+-- Inside the canvas our layers would inherit its zoom: undo it, so they keep
+-- the container's scale (they are anchored to the container either way).
+local function FitLayers()
+    local p = overlay:GetParent()
+    local s = (p and p ~= container) and p:GetScale() or 1
+    if not s or s <= 0 then s = 1 end
+    local want = 1 / s
+    if overlay.fit ~= want then
+        overlay:SetScale(want)
+        labelLayer:SetScale(want)
+        if cityLayer then cityLayer:SetScale(want) end
+        overlay.fit = want
+    end
+end
+
+-- Which frame hosts our layers. At rest, and while moving with Blizzard's
+-- canvas in sync: the canvas itself (the frame that holds the map tiles and
+-- every pin), so the pins - the player arrow, Blizzard's icons, Questie's -
+-- always draw on top of our art, whatever order the engine renders sibling
+-- frames in. Detached (moving, canvas out of sync): the container, next to
+-- the canvas, whose (stale) pins are then hidden with it.
+local function HostLayers(detached)
+    local host = (not detached and container.Child) or container
+    for _, f in ipairs({ overlay, labelLayer, cityLayer }) do
+        if f:GetParent() ~= host then
+            f:SetParent(host)
+            f.level = nil -- (reparenting re-levels the frame: set it again)
+        end
+    end
+    FitLayers()
+end
+
+-- Where the overlay sits: just above Blizzard's map art, under the pins, at
+-- rest and while the canvas follows the view (live); above all pins only
+-- while moving detached. While moving, an invisible frame above the pins
+-- takes the mouse, so a press grabs the map (or stops a glide) instead of
+-- clicking a pin sliding under the cursor.
+local function SetOverlayMode(moving)
+    local detached = moving and not live
+    HostLayers(detached)
+    local level = detached and OVERLAY_LEVEL_MOVING or restLevel
+    if overlay.level ~= level then
+        ns.SetLevelFixed(overlay, level)
+        overlay.level = level
+    end
+    -- (3.1.1) the city layer: right above Blizzard's map art pins in the canvas, above the moving overlay detached.
+    -- (3.1.2) Over a zone map just above its explored areas - under the quest / scenario blobs, which only zone maps
+    -- draw (MapUtil.ShouldMapTypeShowQuests); this client draws no zone highlight there (no city has a zone as its
+    -- parent map) - and over a continent or the world map above the zone highlight too.
+    local cl
+    if detached then
+        cl = OVERLAY_LEVEL_MOVING + 150
+    else
+        local e = ns.maps[WorldMapFrame:GetMapID()]
+        local wide = e and e.mapType and e.mapType <= (ns.MAPTYPE_CONTINENT or 2)
+        cl = (wide and cityLevel) or cityLevelZone or cityLevel or level
+    end
+    if cityLayer.level ~= cl then
+        ns.SetLevelFixed(cityLayer, cl)
+        cityLayer.level = cl
+    end
+    Render:SetLevelCap(detached and (OVERLAY_LEVEL_MOVING + 280) or restStageCap)
+    -- Inside the canvas (at rest, and while it follows the view) the real
+    -- map's explored areas draw above our band; pictures stacked above that
+    -- map's pieces go just above them (see Render). Detached: the canvas is
+    -- hidden, no lift.
+    Render:SetRestLift(liftLo, liftHi, (not detached) and WorldMapFrame:GetMapID() or nil)
+    local labelLevel = detached and LABELS_LEVEL_MOVING or labelsRestLevel
+    if labelLayer.level ~= labelLevel then
+        ns.SetLevelFixed(labelLayer, labelLevel)
+        labelLayer.level = labelLevel
+    end
+    if catcher:IsShown() ~= moving then catcher:SetShown(moving) end
+
+    overlayMoving = detached
+    UpdateCanvasAlpha()
+    -- Classic Era's map opacity slider makes the canvas translucent; then we
+    -- show Blizzard's map alone at rest instead of stacking ours on it.
+    translucent = container:GetAlpha() < 0.999
+end
+
+---------------------------------------------------------------------------
+-- Real (Blizzard) map <-> camera
+---------------------------------------------------------------------------
+
+-- Blizzard canvas scale + normalized view centre that show camera c on map M.
+-- (Scale comes from the map's width; vertical position from its own rect
+-- height, which is how Blizzard places pins.)
+local function RealParams(M, c)
+    local ppx = ns.PixelsPerUnit(v, c.vw)
+    local s = (M.x1 - M.x0) * ppx / M.lw
+    local P = (c.x - M.x0) / (M.x1 - M.x0)
+    local Q = (c.y - M.y0) / (M.y1 - M.y0)
+    return s, P, Q
+end
+
+-- Can Blizzard's canvas for map M show camera c exactly? (zoom at least the
+-- map's fit, and the view inside the map the way Blizzard clamps scrolling)
+local function Holds(M, c)
+    if ns.ZoomOf(v, M, c.vw) < 1 - 1e-4 then return false end
+    local s, P, Q = RealParams(M, c)
+    local xOff, yOff = (v.W / 2) / (s * M.lw), (v.H / 2) / (s * M.lh)
+    local tx, ty = 0.5 / (s * M.lw), 0.5 / (s * M.lh) -- half a pixel
+    if xOff >= 0.5 then
+        if math.abs(P - 0.5) > tx then return false end
+    elseif P < xOff - tx or P > 1 - xOff + tx then
+        return false
+    end
+    if yOff >= 0.5 then
+        if math.abs(Q - 0.5) > ty then return false end
+    elseif Q < yOff - ty or Q > 1 - yOff + ty then
+        return false
+    end
+    return true
+end
+
+-- Constrain camera c to what map M's canvas can show (zoom >= fit, view
+-- inside the map), mirroring Blizzard's CalculateScrollExtentsAtScale.
+local function ClampToMap(M, c)
+    if ns.ZoomOf(v, M, c.vw) < 1 then c.vw = ns.WidthForZoom(v, M, 1) end
+    local s, P, Q = RealParams(M, c)
+    local xOff = math.min((v.W / 2) / (s * M.lw), 0.5)
+    local yOff = math.min((v.H / 2) / (s * M.lh), 0.5)
+    P = ns.Clamp(P, xOff, 1 - xOff)
+    Q = ns.Clamp(Q, yOff, 1 - yOff)
+    c.x = M.x0 + P * (M.x1 - M.x0)
+    c.y = M.y0 + Q * (M.y1 - M.y0)
+end
+
+local function ReadRealView()
+    local M = ns.GetMap(WorldMapFrame:GetMapID())
+    if not M then return nil end
+    local s = container:GetCanvasScale()
+    if not s or s <= 0 then return nil end
+    local P = container:GetCurrentScrollX() or 0.5
+    local Q = container:GetCurrentScrollY() or 0.5
+    local vw = v.lw0 * v.fit0 * (M.x1 - M.x0) / (M.lw * s)
+    return { x = M.x0 + P * (M.x1 - M.x0), y = M.y0 + Q * (M.y1 - M.y0), vw = vw, map = M }
+end
+
+local function SetRealView(s, P, Q)
+    if fourArgPanZoom then
+        -- ignoreScaleRatio = true: (P, Q) is the exact new view centre.
+        container:InstantPanAndZoom(s, P, Q, true)
+    else
+        -- Classic Era: the pan is blended with the current one by
+        -- currentScale/newScale. Step to 2x first so that factor is exactly 2,
+        -- then ask for the pan that lands on P, Q.
+        container:InstantPanAndZoom(s * 2, 0.5, 0.5)
+        local cx = container:GetCurrentScrollX() or 0.5
+        local cy = container:GetCurrentScrollY() or 0.5
+        container:InstantPanAndZoom(s, 2 * cx - P, 2 * cy - Q)
+    end
+end
+
+local function DiffersFromCam(r)
+    local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+    return math.abs(r.x - cam.x) * ppx > 0.5 or math.abs(r.y - cam.y) * ppy > 0.5
+        or math.abs(r.vw / cam.vw - 1) > 0.001
+end
+
+local function SyncReal(M)
+    syncing = true
+    local ok, err = pcall(function()
+        if WorldMapFrame:GetMapID() ~= M.id then
+            WorldMapFrame:SetMapID(M.id)
+        end
+        SetRealView(RealParams(M, cam))
+    end)
+    syncing = false
+    if not ok then
+        geterrorhandler()(err)
+        return
+    end
+    -- If Blizzard clamped anything, follow what it actually shows.
+    local real = ReadRealView()
+    if real and DiffersFromCam(real) then
+        cam.x, cam.y, cam.vw = real.x, real.y, real.vw
+    end
+end
+
+-- (3.3.1) May we switch Blizzard's map to map id without tainting the objective tracker? A switch we make runs the
+-- map's refresh under our taint (MapCanvasMixin:OnMapChanged): QuestDataProvider puts a pin on each quest of the map
+-- and styles it from the shared QuestCache (POIButtonUtil.GetStyle -> QuestCache:Get), which creates the quest's object
+-- on its first Get - or fills in its quest-log fields (QuestMixin:CheckRefresh) - under whoever asked; the tracker reads
+-- those objects (BuildQuestWatchInfos), and one made under our taint taints every tracker update after it (in combat
+-- the scenario module's aura read is refused: "GetAuraDataByIndex(): Auras cannot be accessed when secret while
+-- tainted"). So: only a map whose pins' quests are all cached already, complete and by Blizzard's own code (one it
+-- showed - the map it opened, a zone clicked - or a tracked quest); one we tainted earlier adds nothing. And not while a
+-- quest's details are open on another map: the quest log would close them (QuestMapFrame_CloseQuestDetails) under our
+-- taint, and the tracker reads the focused quest. The current map may always stay. Without the quest APIs: true.
+-- (The quest part is kept for a second per map: the live map asks every moving frame.)
+local questSafeAt, questSafeOK = {}, {}
+local function QuestSafe(id)
+    if id == WorldMapFrame:GetMapID() then return true end
+    local d = QuestMapFrame and QuestMapFrame.DetailsFrame
+    if d and d.questMapID and d.questMapID ~= id then return false end
+    local now = GetTime()
+    if questSafeAt[id] and now - questSafeAt[id] < 1 then return questSafeOK[id] end
+    questSafeAt[id], questSafeOK[id] = now, false
+    local cache = QuestCache and QuestCache.objects
+    local QL = C_QuestLog
+    if type(cache) ~= "table" or not (QL and QL.GetQuestsOnMap and C_Map and C_Map.GetMapInfo) then
+        questSafeOK[id] = true
+        return true
+    end
+    local function Cached(q)
+        local o = cache[q]
+        if type(o) ~= "table" then return false end
+        if issecurevariable and not issecurevariable(o, "questID") then return true end -- (tainted already)
+        return o.hasQuestLogInfo == true or not (QL.GetLogIndexForQuestID and QL.GetLogIndexForQuestID(q))
+    end
+    local info = C_Map.GetMapInfo(id)
+    if info and MapUtil and MapUtil.ShouldMapTypeShowQuests and MapUtil.ShouldMapTypeShowQuests(info.mapType) then
+        local ok, quests = pcall(QL.GetQuestsOnMap, id)
+        for _, q in ipairs(ok and type(quests) == "table" and quests or {}) do
+            local qid = q.questID
+            if qid and not q.isMapIndicatorQuest and (not HaveQuestData or HaveQuestData(qid)) and not Cached(qid) then
+                return false
+            end
+        end
+    end
+    -- (the waypoint pin: the super-tracked quest's next waypoint on this map, continents too)
+    local sq = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
+    if sq and sq ~= 0 and QL.GetNextWaypointForMap and QL.GetNextWaypointForMap(sq, id) and not Cached(sq) then
+        return false
+    end
+    questSafeOK[id] = true
+    return true
+end
+
+-- Which real map to line up with the camera: the most detailed one that can
+-- show exactly this view (so nothing moves), preferring the zone you're over.
+-- (3.3.1) ok(mapID): only the maps it returns true for (QuestSafe).
+local function ChooseHandover(c, ok)
+    local focus, contFocus = Render:GetFocus(), Render:GetContinentFocus()
+    local realID = WorldMapFrame:GetMapID()
+    local best, bestScore
+    for _, e in ipairs(ns.drawList) do
+        if Holds(e, c) and (not ok or ok(e.id)) then
+            local score = ((e.mapType == ns.MAPTYPE_ZONE) and 100000 or 0)
+                + ((e.id == focus or e.id == contFocus) and 10000 or 0)
+                + e.nest * 1000
+                + ((e.id == realID) and 100 or 0)
+                + e.order * 0.001
+            if not bestScore or score > bestScore then best, bestScore = e, score end
+        end
+    end
+    if best then return best end
+    local world = ns.maps[ns.WORLD_MAP_ID]
+    if world and Holds(world, c) and (not ok or ok(world.id)) then return world end
+end
+
+---------------------------------------------------------------------------
+-- Live motion: Blizzard's canvas follows the camera while the map moves
+---------------------------------------------------------------------------
+
+-- Which real map follows the camera: the current one while it can show
+-- exactly this view - a better one (the map the settle would pick) takes
+-- over once it has been preferred for LIVE_SWITCH_DELAY, so a border never
+-- flips maps back and forth - else the best one at once. Never another map
+-- in combat (see BeginSettle), and during a flight to a map someone asked
+-- for (a click, Questie, the quest log) only that map.
+-- (3.1.0) The view the motion is heading to. A glide: where it comes to rest (it slows down by MOMENTUM_DECAY, so it
+-- still travels vel / MOMENTUM_DECAY). A drag: where it would be DRAG_AHEAD seconds on at its present speed (a still
+-- or slow drag: the view itself). A wheel zoom: its target zoom about its anchor, kept on the city the way the zoom
+-- will be (Confine). nil: no such view (a flight, at rest).
+local DRAG_AHEAD = 0.5
+local liveProbe = {}
+local function PanAhead()
+    if state ~= "free" or (vel.x == 0 and vel.y == 0) then return nil end
+    local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+    local t = drag.active and DRAG_AHEAD or 1 / MOMENTUM_DECAY
+    liveProbe.x, liveProbe.y, liveProbe.vw = cam.x - vel.x * t / ppx, cam.y - vel.y * t / ppy, cam.vw
+    return liveProbe
+end
+-- Is M a capital that draws its own patch (WoW Forever, cells on)? Only there do the rules below differ from 3.0.1.
+local function CityMap(M)
+    return M ~= nil and Render.HasCityPatch ~= nil and Render:HasCityPatch(M.id) == true
+end
+-- The city whose own map can show view c (the view lies inside it), if any.
+local function CityHolding(c)
+    for _, id in ipairs(ns.CAPITALS) do
+        local M = ns.maps[id]
+        if M and CityMap(M) and Holds(M, c) then return M end
+    end
+end
+local function LiveProbe()
+    if state == "free" and anchor and not drag.active and math.abs(targetVw / cam.vw - 1) > 1e-4 then
+        local ppx, ppy = ns.PixelsPerUnit(v, targetVw)
+        liveProbe.vw = targetVw
+        liveProbe.x, liveProbe.y = Confine(liveProbe, anchor.wx - (anchor.sx - v.W / 2) / ppx, anchor.wy - (anchor.sy - v.H / 2) / ppy)
+        return liveProbe
+    end
+    return PanAhead()
+end
+
+local function LiveMap(now)
+    local cur = ns.GetMap(WorldMapFrame:GetMapID())
+    if cur and not Holds(cur, cam) then cur = nil end
+    if (fly and fly.external) or InCombatLockdown() then
+        livePrefID = nil
+        return cur
+    end
+    local best = ChooseHandover(cam, QuestSafe) -- (3.3.1: a map we may switch to)
+    -- (3.1.0) A map the motion only passes through does not take over: every SetMapID reloads the pins.
+    local probe = best and LiveProbe()
+    local dest = probe and ChooseHandover(probe, QuestSafe)
+    -- (the view ends inside a city: then the city has the focus there, and its map is the one - see FocusZoneAt)
+    if dest and not CityMap(dest) then dest = CityHolding(probe) or dest end
+    if dest and dest ~= best then
+        local pan = probe.vw == cam.vw
+        if not cur then
+            -- The current map was left. A zoom out or a glide (where it ends is known): the map of the view the
+            -- motion ends on, if it can show this one too - not one that is left again a frame or two later (Searing
+            -- Gorge -> Burning Steppes -> Eastern Kingdoms in consecutive frames). A drag that leaves through a
+            -- city's own map: likewise. (Not for a zoom in, nor for a drag between zones - a drag may stop anywhere:
+            -- tested, both made the map change more often.)
+            if (probe.vw > cam.vw * 1.0001 or CityMap(best) or (pan and not drag.active)) and Holds(dest, cam) then best = dest end
+        elseif best ~= cur and (pan or CityMap(dest) or CityMap(best)) then
+            -- A better map than the current one, but not the one the motion ends on: a map a glide or a fast drag
+            -- only crosses (a zone's corner, a city), or the zone on the way into a city (continent -> zone ->
+            -- city). The current map stays until the one the motion ends on can take over.
+            best = cur
+        end
+    end
+    if not cur or not best or best == cur then
+        livePrefID = nil
+        return cur or best
+    end
+    if livePrefID ~= best.id then livePrefID, livePrefT = best.id, now end
+    -- (3.1.0: and, zooming at a city, not while the wheel is still being spun - the zoom's target moves with every
+    -- notch, and each map on the way would reload the pins)
+    local since = livePrefT
+    if lastWheel > since and anchor and CityMap(DeepestAt(anchor.wx, anchor.wy)) then since = lastWheel end
+    if now - since < LIVE_SWITCH_DELAY then return cur end
+    livePrefID = nil
+    return best
+end
+
+local liveMap
+local function LiveSyncCall()
+    if WorldMapFrame:GetMapID() ~= liveMap.id then WorldMapFrame:SetMapID(liveMap.id) end
+    SetRealView(RealParams(liveMap, cam))
+end
+
+-- Point Blizzard's canvas at the camera on map M (only what changed).
+-- Returns true when it now shows exactly our view. Unlike the settle, a
+-- clamp is never adopted: the camera is the user's while it moves.
+local function LiveSync(M)
+    if not M then return false end
+    local s, P, Q = RealParams(M, cam)
+    if WorldMapFrame:GetMapID() ~= M.id or s ~= container:GetCanvasScale()
+        or P ~= container:GetCurrentScrollX() or Q ~= container:GetCurrentScrollY() then
+        liveMap = M
+        syncing = true
+        local ok, err = pcall(LiveSyncCall)
+        syncing = false
+        liveMap = nil
+        if not ok then
+            geterrorhandler()(err)
+            return false
+        end
+    end
+    liveS, liveP, liveQ = container:GetCanvasScale(), container:GetCurrentScrollX(), container:GetCurrentScrollY()
+    local real = ReadRealView()
+    return real ~= nil and real.map == M and not DiffersFromCam(real)
+end
+
+-- Every drawn frame while moving (and whenever motion starts): keep
+-- Blizzard's canvas on the camera, exactly like its own zoom animation
+-- updates it every frame, so its pins move with the map (live: our layers
+-- stay inside the canvas, under the pins). Where no map can show the view
+-- (or on Classic Era, whose pan needs two steps), detach instead: the canvas
+-- is hidden and our layers go above it until the view settles.
+local function SyncMoving()
+    local now = GetTime()
+    live = (db.livePins ~= false and fourArgPanZoom and not translucent and state ~= "hold"
+        and LiveSync(LiveMap(now))) or false
+    liveT = now
+    if live and fly then fly.liveUsed = true end
+    SetOverlayMode(true)
+end
+
+---------------------------------------------------------------------------
+-- Focus: which continent / zone is drawn on top where their maps overlap
+---------------------------------------------------------------------------
+local function WalkUpTo(id, wantType)
+    local guard = 0
+    while id and id ~= 0 and guard < 8 do
+        local m = ns.maps[id]
+        if m and m.mapType == wantType then return id end
+        local mi = C_Map.GetMapInfo(id)
+        id = mi and mi.parentMapID
+        guard = guard + 1
+    end
+end
+
+local function ContinentAt(x, y)
+    local ok, info = pcall(C_Map.GetMapInfoAtPosition, ns.WORLD_MAP_ID, x, y)
+    if ok and info then
+        local id = WalkUpTo(info.mapID, ns.MAPTYPE_CONTINENT)
+        if id then return id end
+    end
+    -- Ocean: keep the current one if we're still over it.
+    local cur = ns.maps[Render:GetContinentFocus()]
+    if cur and ns.RectContains(cur, x, y) then return cur.id end
+    local best, bestD
+    for _, e in ipairs(ns.drawList) do
+        if e.mapType == ns.MAPTYPE_CONTINENT and ns.RectContains(e, x, y) then
+            local d = (e.cx - x) ^ 2 + (e.cy - y) ^ 2
+            if not bestD or d < bestD then best, bestD = e, d end
+        end
+    end
+    return best and best.id
+end
+
+local function ZoneAt(x, y, contID)
+    local cont = ns.maps[contID]
+    if cont and ns.RectContains(cont, x, y) then
+        local ok, info = pcall(C_Map.GetMapInfoAtPosition, cont.id,
+            (x - cont.x0) / (cont.x1 - cont.x0), (y - cont.y0) / (cont.y1 - cont.y0))
+        if ok and info and info.mapID ~= cont.id then
+            local id = WalkUpTo(info.mapID, ns.MAPTYPE_ZONE)
+            if id then return id end
+        end
+    end
+    local best
+    for _, e in ipairs(ns.drawList) do
+        if e.mapType == ns.MAPTYPE_ZONE and ns.RectContains(e, x, y) and (not best or e.area < best.area) then
+            best = e
+        end
+    end
+    return best and best.id
+end
+
+-- Focus only changes when the view centre actually crosses into another
+-- continent/zone, so overlapping zone art never swaps without a reason.
+local lastZoneAt, lastContAt
+-- A capital city only becomes the focus once it's zoomed in enough for its
+-- own map to show; before that, the zone around it is (so its map art
+-- doesn't vanish when you pan over the city).
+local capitalSet
+local function IsCapital(id)
+    if not capitalSet then
+        capitalSet = {}
+        for _, c in ipairs(ns.CAPITALS) do capitalSet[c] = true end
+    end
+    return capitalSet[id] == true
+end
+-- A capital's own zone: the one holding most of the city's map rect
+-- (Ironforge -> Dun Morogh, Thunder Bluff -> Mulgore, Undercity -> Tirisfal).
+-- The smallest zone rect around a point is often a neighbour's: the Wetlands'
+-- rect reaches over Ironforge, Desolace's over Thunder Bluff, Silverpine's
+-- over Undercity - their whole map would be drawn over the city's zone.
+local capitalHome = {}
+local function HomeZone(m)
+    local h = capitalHome[m.id]
+    if h == nil then
+        local best, bestShare
+        for _, e in ipairs(ns.drawList) do
+            if e.mapType == ns.MAPTYPE_ZONE and not IsCapital(e.id) then
+                local w = math.min(m.x1, e.x1) - math.max(m.x0, e.x0)
+                local hh = math.min(m.y1, e.y1) - math.max(m.y0, e.y0)
+                local share = (w > 0 and hh > 0) and w * hh / m.area or 0
+                if share > 0 and (not best or share > bestShare + 1e-6
+                    or (share > bestShare - 1e-6 and e.area < best.area)) then
+                    best, bestShare = e, share
+                end
+            end
+        end
+        h = best or false
+        capitalHome[m.id] = h
+    end
+    return h or nil
+end
+-- (3.1.0) Does the view of camera c lie inside map m (it may poke tol px out)?
+local function ViewInside(m, c, tol)
+    local ppx, ppy = ns.PixelsPerUnit(v, c.vw)
+    return (c.x - m.x0) * ppx >= v.W / 2 - tol and (m.x1 - c.x) * ppx >= v.W / 2 - tol
+        and (c.y - m.y0) * ppy >= v.H / 2 - tol and (m.y1 - c.y) * ppy >= v.H / 2 - tol
+end
+local function FocusZoneAt(x, y, contID)
+    local id = ZoneAt(x, y, contID)
+    local m = id and ns.maps[id]
+    -- (switch in once the city's own map shows, out a bit lower: no flicker)
+    local need = (Render:GetFocus() == id) and 0.9 or 0.97
+    local cap = m and IsCapital(id)
+    local out = cap and ns.ZoomOf(v, m, cam.vw) < need
+    local patch = cap and Render.HasCityPatch and Render:HasCityPatch(id)
+    if patch then
+        -- (3.1.0) Where the city draws a patch (WoW Forever, cells on) it needs no focus to show: the city has the focus
+        -- only while the VIEW lies inside its map (kept until it pokes 6 px out) - then its own picture is Blizzard's
+        -- city map exactly. Anywhere else its home zone has it, so no half-faded city rectangle shows at a city's edge
+        -- and the home zone's picture does not come and go there.
+        -- A fling or a fast drag that only crosses the city (the view it would come to rest on is not inside it) leaves
+        -- the focus alone.
+        out = not ViewInside(m, cam, (Render:GetFocus() == id) and 6 or 0.5)
+        if not out and Render:GetFocus() ~= id then
+            local p = PanAhead()
+            if p and not ViewInside(m, p, 0.5) then out = true end
+        end
+    end
+    if out then
+        local home = HomeZone(m)
+        if home and (patch or ns.RectContains(home, x, y)) then return home.id end
+        local best
+        for _, e in ipairs(ns.drawList) do
+            if e.mapType == ns.MAPTYPE_ZONE and not IsCapital(e.id) and ns.RectContains(e, x, y)
+                and (not best or e.area < best.area) then
+                best = e
+            end
+        end
+        if best then return best.id end
+    end
+    return id
+end
+
+-- Depth confinement. A capital's map is far more detailed than its zone's
+-- (Ironforge ~6x Dun Morogh, Stormwind 2x Elwynn), so the wheel goes deeper
+-- over the city (DeepestAt) - but past the zone's own depth limit (maxZoom
+-- past the zone's fit) the land around the city only exists as the zone's
+-- picture blown up 10-25x. Once you zoom past that limit over a city (or rest
+-- on the city's own map that deep), the view is kept on the city, the way
+-- Blizzard keeps a map's view inside the map (CalculateScrollExtentsAtScale):
+-- over the next DEPTH_RAMP of zoom the share of the view allowed past the
+-- city's edge shrinks from a whole view (the view need only touch the city)
+-- to none, so zooming in draws the city into the view as part of the zoom
+-- (CityZoom), dragging or a fling stops at its edge, and resting on the city
+-- needs no correction. Zooming out only ever widens the allowed area, and
+-- back at the zone's limit the city lets go.
+local DEPTH_RAMP = 1.69 -- (two wheel notches at the default step)
+local depthCity         -- the capital the view is kept on, or nil
+
+-- View width at the depth limit of a capital's own zone (nil: none known).
+local function CityLimit(C)
+    local home = HomeZone(C)
+    return home and ns.WidthForZoom(v, home, db.maxZoom)
+end
+
+-- The zone's limit and the width from which the view is wholly on the city:
+-- DEPTH_RAMP deeper - or the city's fit, when that comes first (then it
+-- can't be dragged, like Blizzard's own city map at fit).
+local function CityRamp(C)
+    local lim = CityLimit(C)
+    if not lim then return nil end
+    local done = lim / DEPTH_RAMP
+    local fit = ns.WidthForZoom(v, C, 1)
+    if fit < lim and fit > done then done = fit end
+    return lim, done
+end
+
+-- Share of the view that may lie past the city's edge at width vw: nil (no
+-- limit) until the zone's limit, then from 1 down to 0 over the ramp.
+local function CityMargin(C, vw)
+    local lim, done = CityRamp(C)
+    if not lim or vw >= lim then return nil end
+    return 1 - ns.Smooth(math.log(lim / vw) / math.log(lim / done))
+end
+
+-- Allowed view centre on one axis in the city's normalized coordinates, for
+-- a half view h and margin m: centred when it doesn't fit (as Blizzard's).
+local function Span(p, h, m)
+    local lo, hi = h - m, 1 - h + m
+    if lo > hi then return 0.5 end
+    return ns.Clamp(p, lo, hi)
+end
+
+-- Centre (x, y) moved to where camera c's view keeps to the city.
+Confine = function(c, x, y)
+    local C = depthCity
+    local g = C and CityMargin(C, c.vw)
+    if not g then return x, y end
+    local s = (C.x1 - C.x0) * ns.PixelsPerUnit(v, c.vw) / C.lw -- (as RealParams)
+    local xOff, yOff = (v.W / 2) / (s * C.lw), (v.H / 2) / (s * C.lh)
+    local P = Span((x - C.x0) / (C.x1 - C.x0), xOff, 2 * xOff * g)
+    local Q = Span((y - C.y0) / (C.y1 - C.y0), yOff, 2 * yOff * g)
+    return C.x0 + P * (C.x1 - C.x0), C.y0 + Q * (C.y1 - C.y0)
+end
+
+-- While the view is kept on a city, the wheel zoom heads for the view it may
+-- end on: the one it would reach anchored at the cursor, moved onto the city
+-- (as Blizzard clamps its own wheel zoom's pan target to the scroll extents
+-- at the next scale, MapCanvas_ScrollContainerMixin.lua:198) - first the one
+-- at the end of the ramp, where the view has to be wholly on the city, so the
+-- pull is spread over all the zoom up to there. The view zooms about the one
+-- point that lands it there - and at every step it is kept on the city at
+-- that step's own zoom - so the city is drawn in by the zoom itself, never
+-- behind it. Where that would slide the point under the cursor more than
+-- MAX_GLIDE_PX in a frame (the cap of every clamp's glide), the zoom step is
+-- shortened instead: the zoom waits for the pull.
+-- The view it heads for puts the spot the wheel was first pointed at (the
+-- aim, anchor.ax/ay: kept while the cursor stays still and the zoom goes in)
+-- under the cursor - as close as the city allows - not the spot the pull has
+-- slid there: so the zoom ends where you pointed. (anchor.wx/wy, the point
+-- under the cursor now, is what each frame's slide is measured from.) A step
+-- stops at the ramp's end, where the view is wholly on the city (for most
+-- capitals the city's fit), and heads on from there: no lurch in the zoom's
+-- speed between the pull and what follows.
+-- (x0, y0, w0): last frame's camera, cam.vw: this frame's zoom step (may be
+-- shortened). Returns the new centre, or nil when the plain anchor is fine
+-- (or the view isn't on the city yet: then the usual glide brings it).
+local cityProbe = {}
+-- Centre at width w on the way (kept on the city at w), and how far that
+-- slides the point under the cursor (px) beyond the cap (<= 0: fine).
+local function CityPath(x0, y0, w0, fx, fy, w)
+    local f = w / w0
+    cityProbe.vw = w
+    local x, y = Confine(cityProbe, fx + (x0 - fx) * f, fy + (y0 - fy) * f)
+    local px, py = ns.PixelsPerUnit(v, w)
+    local ax = anchor.wx - (anchor.sx - v.W / 2) / px
+    local ay = anchor.wy - (anchor.sy - v.H / 2) / py
+    local slide = math.sqrt(((x - ax) * px) ^ 2 + ((y - ay) * py) ^ 2)
+    return x, y, slide - MAX_GLIDE_PX, slide
+end
+local function CityZoom(x0, y0, w0)
+    local ww = targetVw
+    local _, done = CityRamp(depthCity)
+    if done and w0 > done * 1.0001 and targetVw < done then
+        ww = done
+        if cam.vw < done then cam.vw = done end
+    end
+    local k = ww / w0
+    if math.abs(1 - k) < 1e-6 then return nil end
+    cityProbe.vw = ww
+    local pxT, pyT = ns.PixelsPerUnit(v, ww)
+    local tx, ty = Confine(cityProbe, anchor.ax - (anchor.sx - v.W / 2) / pxT, anchor.ay - (anchor.sy - v.H / 2) / pyT)
+    local fx, fy = (tx - k * x0) / (1 - k), (ty - k * y0) / (1 - k)
+    if select(4, CityPath(x0, y0, w0, fx, fy, w0)) > 0.5 then return nil end
+    local w1 = cam.vw
+    local x, y, over, s = CityPath(x0, y0, w0, fx, fy, w1)
+    if s < 0.05 then return nil end
+    if over > 0 then
+        -- the longest step (in log width) whose slide stays within the cap
+        local l0, l1, lo, hi = math.log(w0), math.log(w1), 0, 1
+        for _ = 1, 12 do
+            local m = (lo + hi) / 2
+            if select(3, CityPath(x0, y0, w0, fx, fy, math.exp(l0 + (l1 - l0) * m))) > 0 then hi = m else lo = m end
+        end
+        w1 = math.exp(l0 + (l1 - l0) * lo)
+        x, y = CityPath(x0, y0, w0, fx, fy, w1)
+    end
+    cam.vw = w1
+    return x, y
+end
+
+-- A wheel notch in that heads past a capital's zone limit with the cursor or
+-- the view centre on the city (the points the depth limit comes from).
+local function EngageCity(points, newT)
+    for i = 1, #points, 2 do
+        local M = DeepestAt(points[i], points[i + 1])
+        if M and IsCapital(M.id) then
+            local lim = CityLimit(M)
+            if lim and newT < lim then depthCity = M end
+        end
+    end
+end
+
+-- Back at (or out past) the zone's limit, with no zoom heading deeper.
+local function ReleaseCity()
+    if not depthCity then return end
+    local lim = CityLimit(depthCity)
+    if not lim or (cam.vw >= lim and targetVw >= lim) then depthCity = nil end
+end
+
+-- At rest: on a capital's own map deeper than its zone's limit, the view is
+-- kept on the city (Blizzard's canvas already keeps it inside); after a
+-- settle anywhere else the city keeps the view only while still that deep.
+local function RestCity()
+    local R = ns.GetMap(WorldMapFrame:GetMapID())
+    if R and IsCapital(R.id) and CityMargin(R, cam.vw) then
+        depthCity = R
+    elseif depthCity and not CityMargin(depthCity, cam.vw) then
+        depthCity = nil
+    end
+end
+
+-- The point that decides the focus (and where zone art is built ahead of
+-- time): the view centre - or, while the wheel is still zooming IN, the
+-- centre that zoom will end on. The point under the cursor stays put, so this
+-- is a blend of the view centre and the cursor, weighted by how much zoom is
+-- still pending: a wheel burst toward a zone at the edge of the view hands
+-- the map to that zone sooner (and skips zones the centre would only cross
+-- on the way), while a finished zoom, a drag, a glide or a mouse that merely
+-- moves leave the focus to the centre - which is what the settle hands over
+-- to Blizzard's map, so the focus at rest still matches the real map.
+local function ZoomDestination()
+    if state == "free" and anchor and targetVw < cam.vw then
+        local ppx, ppy = ns.PixelsPerUnit(v, targetVw)
+        return anchor.wx - (anchor.sx - v.W / 2) / ppx, anchor.wy - (anchor.sy - v.H / 2) / ppy
+    end
+    return cam.x, cam.y
+end
+
+local function UpdateFocus(now, force)
+    if not force and now - focusCheckT < 0.08 then return end
+    focusCheckT = now
+    local fx, fy = ZoomDestination()
+    local contID = ContinentAt(fx, fy)
+    local zoneID = FocusZoneAt(fx, fy, contID or Render:GetContinentFocus())
+    if contID ~= lastContAt then
+        lastContAt = contID
+        Render:SetContinentFocus(contID)
+    end
+    if zoneID ~= lastZoneAt then
+        lastZoneAt = zoneID
+        Render:SetFocus(zoneID)
+    end
+end
+
+-- After a map change we didn't make, the real map (and its continent) goes
+-- on top, like Blizzard's own view of it.
+local function FocusRealMap()
+    local M = ns.GetMap(WorldMapFrame:GetMapID())
+    local contID = ContinentAt(cam.x, cam.y)
+    lastContAt = contID
+    lastZoneAt = FocusZoneAt(cam.x, cam.y, contID or Render:GetContinentFocus())
+    if M and M.mapType == ns.MAPTYPE_ZONE then
+        Render:SetFocus(M.id)
+        Render:SetContinentFocus(WalkUpTo(M.parent, ns.MAPTYPE_CONTINENT) or contID)
+    elseif M and M.mapType == ns.MAPTYPE_CONTINENT then
+        Render:SetContinentFocus(M.id)
+        Render:SetFocus(lastZoneAt)
+    else
+        Render:SetContinentFocus(contID)
+        Render:SetFocus(lastZoneAt)
+    end
+end
+
+---------------------------------------------------------------------------
+-- Drawing
+---------------------------------------------------------------------------
+local function Moving()
+    return state == "free" or state == "fly" or state == "hold"
+end
+
+-- Returns true while art is still loading / fading in.
+local function DrawFrame()
+    local busy = false
+    if Moving() then SyncMoving() end
+    -- Zooming in: build the zone art where the zoom is heading ahead of time.
+    if state == "free" and targetVw < cam.vw then
+        local tx, ty = ZoomDestination()
+        Render:SetPrefetch(tx, ty, targetVw)
+    else
+        Render:SetPrefetch(nil)
+    end
+    if overlay:IsShown() then busy = Render:Draw(cam, v) end
+    UpdateCanvasAlpha()
+    if db.labels and state ~= "off" and (Moving() or db.labelsAtRest) then
+        labelLayer:Show()
+        Labels:Draw(cam, v)
+    else
+        Labels:HideAll()
+    end
+    return busy
+end
+
+local function GoOff()
+    state = "off"
+    fly, anchor, restAim = nil, nil, nil
+    drag.pending, drag.active = false, false
+    vel.x, vel.y = 0, 0
+    realDirty, restBusy = false, false
+    live, livePrefID = false, nil
+    depthCity = nil
+    if ns.Follow then ns.Follow:Stop() end -- (3.3.0: the map closed)
+    if overlay then
+        if container.Child and container.Child:GetAlpha() < 1 then container.Child:SetAlpha(1) end
+        HostLayers(true)
+        catcher:Hide()
+        overlay:Hide()
+        cityLayer:Hide() -- (3.1.2: the overlay's OnHide does not fire while the map is closed)
+        Render:HideAll()
+        Labels:HideAll()
+        driver:Hide()
+        SetBlizzardWheel(false)
+    end
+end
+
+-- keepFocus: after our own settle, keep the art layering exactly as it was
+-- while moving (the camera didn't move, so nothing should change).
+local function EnterRest(keepFocus)
+    Render:SetFadeTime(nil)
+    state = "rest"
+    restAim = anchor
+    fly, anchor = nil, nil
+    live, livePrefID = false, nil
+    targetVw = cam.vw
+    RestCity()
+    SetBlizzardWheel(true)
+    SetOverlayMode(false)
+    if not keepFocus then FocusRealMap() end
+    -- With a translucent (opacity-slider) canvas, show Blizzard's map alone.
+    overlay:SetShown(not translucent)
+    -- (hidden: nothing draws at rest, so drop half-done picture/ring fades;
+    -- the next motion then starts from the settled look, like Blizzard's map)
+    if translucent then Render:HideAll() end
+    restBusy = DrawFrame()
+    if restBusy then driver:Show() elseif not drag.pending and not realDirty then driver:Hide() end
+end
+
+-- Adopt whatever Blizzard's map currently shows, then rest.
+local function ResyncFromReal()
+    if not ready or not WorldMapFrame:IsShown() then return end
+    if not db.enabled or not UpdateView() then
+        GoOff()
+        return
+    end
+    local real = ReadRealView()
+    if real then
+        cam.x, cam.y, cam.vw = real.x, real.y, real.vw
+        EnterRest()
+    else
+        GoOff()
+    end
+end
+
+-- (3.3.0, Follow.lua: the M key) Show world point (x, y) at world zoom z at once: on the most detailed map that can show
+-- that view - in combat on the map the game opened, the view kept inside it.
+local function JumpToZoom(x, y, z)
+    if not ready or not db.enabled or not WorldMapFrame:IsShown() or not UpdateView() then return false end
+    local world = ns.maps[ns.WORLD_MAP_ID]
+    if not world then return false end
+    cam.x, cam.y, cam.vw = x, y, ns.WidthForZoom(v, world, z)
+    local M = (not InCombatLockdown() and ChooseHandover(cam, QuestSafe)) or ns.GetMap(WorldMapFrame:GetMapID())
+    if not M then return false end
+    if not Holds(M, cam) then ClampToMap(M, cam) end
+    fly, anchor, restAim = nil, nil, nil
+    vel.x, vel.y = 0, 0
+    SyncReal(M)
+    EnterRest()
+    return true
+end
+
+---------------------------------------------------------------------------
+-- Modes
+---------------------------------------------------------------------------
+local function EnterFree()
+    if state == "rest" or state == "off" then
+        local real = ReadRealView()
+        if real then cam.x, cam.y, cam.vw = real.x, real.y, real.vw end
+        -- Blizzard moved its map past the city's edge at rest (a gamepad,
+        -- another addon - more than a press before a drag starts): that view
+        -- stays, and the city lets go instead of pulling it back.
+        if depthCity then
+            local x, y = Confine(cam, cam.x, cam.y)
+            local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+            if math.abs(x - cam.x) * ppx + math.abs(y - cam.y) * ppy > dragThreshold + 2 then depthCity = nil end
+        end
+    end
+    if state ~= "free" then
+        targetVw = cam.vw
+        lastHolderID, gliding = nil, false
+    end
+    fly = nil
+    Render:SetFadeTime(nil)
+    state = "free"
+    SyncMoving()
+    overlay:Show()
+    UpdateFocus(GetTime(), true) -- only re-ranks if the centre crossed a border
+    DrawFrame()
+    driver:Show()
+end
+
+-- A zoom out whose start view lies inside the target view: a zoom about the
+-- one point that keeps its place on screen, so every view on the way is
+-- nested between the two. (The general path lets the pan lag the zoom, so
+-- its views can stick out of the target map; nested ones never do, and the
+-- map that was asked for - and its pins - can follow the whole flight.)
+-- Views in uniform units (x * lw0, y * lh0, width); nil if not nested.
+local function NestedPath(x0, y0, w0, x1, y1, w1, S)
+    local a = v.H / v.W -- view height / width
+    local eps = w1 * 1e-6
+    if not (w1 > w0 * 1.000001) or math.abs(x1 - x0) + w0 / 2 > w1 / 2 + eps
+        or math.abs(y1 - y0) + w0 * a / 2 > w1 * a / 2 + eps then
+        return nil
+    end
+    local fx = (x0 * w1 - x1 * w0) / (w1 - w0)
+    local fy = (y0 * w1 - y1 * w0) / (w1 - w0)
+    local L = math.log(w1 / w0)
+    return function(s)
+        local k = math.exp(L * ns.Clamp01(S > 0 and s / S or 1))
+        return fx + (x0 - fx) * k, fy + (y0 - fy) * k, w0 * k
+    end
+end
+
+-- external: a flight to a map someone else switched to (see OnMapChanged).
+local function StartFly(target, onDone, external)
+    local k = v.W / v.fit0 -- camera width in uniform units = vw * k
+    local x0, y0, w0 = cam.x * v.lw0, cam.y * v.lh0, cam.vw * k
+    local x1, y1, w1 = target.x * v.lw0, target.y * v.lh0, target.vw * k
+    local S, path = ns.ZoomPath(x0, y0, w0, x1, y1, w1, 1.4)
+    if not (S == S) or S == math.huge or S < 0 then S = 0 end -- NaN / inf guard
+    if external and fourArgPanZoom and target.map and Holds(target.map, cam) then
+        -- (same duration as the general path)
+        path = NestedPath(x0, y0, w0, x1, y1, w1, S) or path
+    end
+    local dur = ns.Clamp(0.3 + S * 0.22, 0.3, 1.5)
+    dur = dur / ((db.flySpeed and db.flySpeed > 0) and db.flySpeed or 1)
+    fly = { S = S, path = path, t = 0, dur = dur, target = target, onDone = onDone,
+        external = external, lockFocus = external }
+    state = "fly"
+    SyncMoving()
+    overlay:Show()
+    DrawFrame()
+    driver:Show()
+end
+
+local BeginSettle
+
+local function EnterHold()
+    state = "hold"
+    SyncMoving()
+    DrawFrame()
+    driver:Show()
+end
+
+BeginSettle = function()
+    local M = ChooseHandover(cam)
+    if not M then
+        -- Safety net: ClampCam keeps the camera holdable, so this only
+        -- corrects float drift. Glide to the nearest view a map can show.
+        local x, y = NearestHoldable(cam)
+        local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+        if math.abs(x - cam.x) * ppx + math.abs(y - cam.y) * ppy < 0.01 then
+            M = ns.maps[ns.WORLD_MAP_ID] -- numerically on the edge; take the world
+        else
+            StartFly({ x = x, y = y, vw = cam.vw }, BeginSettle)
+            return
+        end
+    end
+    if M.id ~= WorldMapFrame:GetMapID() and not InCombatLockdown() and not QuestSafe(M.id) then
+        -- (3.3.1) A switch that would cache that map's quests under our taint (QuestSafe): the best map we may switch
+        -- to - the continent, the world map - else the current one, else our overlay until the next input.
+        local S = ChooseHandover(cam, QuestSafe)
+        local R = ns.GetMap(WorldMapFrame:GetMapID())
+        if S then
+            M = S
+        elseif R and Holds(R, cam) then
+            M = R
+        else
+            EnterHold()
+            return
+        end
+    end
+    if M.id ~= WorldMapFrame:GetMapID() and InCombatLockdown() then
+        -- Switching maps in combat can trip Blizzard's protected pin code
+        -- under our taint. Stay on the current map if it can show the view,
+        -- otherwise keep our overlay up until combat ends.
+        local R = ns.GetMap(WorldMapFrame:GetMapID())
+        if R and Holds(R, cam) then
+            M = R
+        else
+            EnterHold()
+            return
+        end
+    end
+    SyncReal(M)
+    EnterRest(true)
+end
+
+---------------------------------------------------------------------------
+-- Per-frame driver
+---------------------------------------------------------------------------
+local function EndDrag()
+    drag.active = false
+    lastInput = GetTime()
+    if vel.x * vel.x + vel.y * vel.y < 2500 then vel.x, vel.y = 0, 0 end
+end
+
+local function UpdateFree(dt, now)
+    local prevX, prevY, prevVw = cam.x, cam.y, cam.vw -- what was on screen last frame
+    if targetVw > 1 then targetVw = 1 end
+    local lv, lt = math.log(cam.vw), math.log(targetVw)
+    if math.abs(lt - lv) < 1e-4 then
+        cam.vw = targetVw
+    else
+        cam.vw = math.exp(lv + (lt - lv) * (1 - math.exp(-dt * ZOOM_RATE)))
+    end
+    -- (kept on a city: the wheel zoom heads onto it, see CityZoom)
+    local cx, cy
+    if depthCity and anchor and not drag.active and cam.vw ~= prevVw then cx, cy = CityZoom(prevX, prevY, prevVw) end
+    local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+
+    if drag.active then
+        if not IsMouseButtonDown("LeftButton") then
+            EndDrag()
+        else
+            local sx, sy = CursorPos()
+            cam.x = drag.wx - (sx - v.W / 2) / ppx
+            cam.y = drag.wy - (sy - v.H / 2) / ppy
+            if dt > 0 then
+                vel.x = vel.x * 0.6 + (sx - drag.lastSx) / dt * 0.4
+                vel.y = vel.y * 0.6 + (sy - drag.lastSy) / dt * 0.4
+            end
+            drag.lastSx, drag.lastSy = sx, sy
+            lastInput = now
+        end
+    elseif cx then
+        cam.x, cam.y = cx, cy
+    elseif anchor then
+        cam.x = anchor.wx - (anchor.sx - v.W / 2) / ppx
+        cam.y = anchor.wy - (anchor.sy - v.H / 2) / ppy
+    end
+
+    local moved = false
+    if not drag.active and (vel.x ~= 0 or vel.y ~= 0) then
+        moved = true
+        anchor = nil
+        cam.x = cam.x - vel.x * dt / ppx
+        cam.y = cam.y - vel.y * dt / ppy
+        local decay = math.exp(-dt * MOMENTUM_DECAY)
+        vel.x, vel.y = vel.x * decay, vel.y * decay
+        if vel.x * vel.x + vel.y * vel.y < 400 then vel.x, vel.y = 0, 0 end
+        lastInput = now
+    end
+
+    local zooming = cam.vw ~= targetVw
+    local panning = drag.active or vel.x ~= 0 or vel.y ~= 0 or moved
+    ReleaseCity()
+    local hx, hy = ClampCam(cam, dt, zooming, prevX, prevY, panning)
+    if anchor then
+        -- Keep the zoom anchored to the cursor from wherever the clamp put us.
+        anchor.wx, anchor.wy = ScreenToWorldWith(cam, anchor.sx, anchor.sy)
+        -- (kept on a city and zooming in: the aim stays, see CityZoom)
+        if not (depthCity and targetVw <= cam.vw) then -- (the aim also outlives a finished notch)
+            anchor.ax, anchor.ay, anchor.asx, anchor.asy = anchor.wx, anchor.wy, anchor.sx, anchor.sy
+        end
+    end
+    if drag.active then
+        -- Same for the drag: at a map edge, re-grab what's under the cursor
+        -- so pulling back responds at once and nothing builds up.
+        drag.wx, drag.wy = ScreenToWorldWith(cam, drag.lastSx, drag.lastSy)
+    end
+    local settled = not gliding and math.abs(hx - cam.x) * ppx + math.abs(hy - cam.y) * ppy < 0.05
+    UpdateFocus(now)
+
+    if settled and not drag.active and vel.x == 0 and vel.y == 0 and not zooming
+        and now - lastInput > IDLE_DELAY then
+        BeginSettle()
+    end
+end
+
+local function UpdateFly(dt, now)
+    local f = fly
+    f.t = f.t + dt
+    local p = ns.EaseInOutCubic(f.t / f.dur)
+    local X, Y, Wv = f.path(p * f.S)
+    local k = v.W / v.fit0
+    cam.x, cam.y, cam.vw = X / v.lw0, Y / v.lh0, Wv / k
+    if not (cam.x == cam.x and cam.y == cam.y and cam.vw == cam.vw and cam.vw > 0) then
+        f.t = f.dur -- numerical trouble: jump to the end
+    end
+    if f.lockFocus and p >= 0.5 then
+        -- Second half of a click flight: the destination goes on top (the
+        -- swap happens while the camera is moving, never before or after).
+        if not f.focusSet then
+            f.focusSet = true
+            -- finish the crossfade just before the flight lands
+            Render:SetFadeTime(math.max(0.06, (f.dur - f.t) * 0.85))
+            local M = f.target.map
+            if M and M.mapType == ns.MAPTYPE_ZONE then
+                Render:SetFocus(M.id)
+                Render:SetContinentFocus(WalkUpTo(M.parent, ns.MAPTYPE_CONTINENT))
+            elseif M and M.mapType == ns.MAPTYPE_CONTINENT then
+                Render:SetContinentFocus(M.id)
+            end
+        end
+    else
+        UpdateFocus(now)
+    end
+    if f.t >= f.dur then
+        cam.x, cam.y, cam.vw = f.target.x, f.target.y, f.target.vw
+        fly = nil
+        f.onDone(f)
+    end
+end
+
+-- (3.3.0, Follow.lua) Following a unit at rest: the camera moves with it (its motion as it is: no lag at any speed) and
+-- glides onto it (where it starts away from the centre), and Blizzard's map pans along - on the same map while that
+-- can show the view, else on the one that can (ChooseHandover). In combat the map never changes: the view stays inside
+-- the current map (the unit may leave the centre until combat ends). On a continent map a zone map takes over again as
+-- soon as it can show the view (its pins).
+local followZoneT = 0
+-- The camera's move with the unit this frame; true when it is already on it (nil: no position).
+local function FollowCamera(dt, now)
+    local tx, ty, mx, my = ns.Follow:Target(now)
+    if not tx then return end
+    local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+    local ex, ey = (tx - cam.x) * ppx, (ty - cam.y) * ppy
+    local still = ex * ex + ey * ey < 0.01 -- (under a tenth of a pixel)
+    if not still then
+        local k = 1 - math.exp(-dt * FOLLOW_RATE)
+        if ex * ex + ey * ey > 4 * (v.W * v.W + v.H * v.H) then k = 1 end -- (two views away - a portal, a long flight: go)
+        local cx, cy = cam.x + (mx or 0), cam.y + (my or 0)
+        cam.x, cam.y = cx + (tx - cx) * k, cy + (ty - cy) * k
+    end
+    return still
+end
+
+local function FollowStep(dt, now)
+    local still = FollowCamera(dt, now)
+    if still == nil then return end
+    local cur = ns.GetMap(WorldMapFrame:GetMapID())
+    local M = (cur and Holds(cur, cam)) and cur or nil
+    local combat = InCombatLockdown()
+    if not M then
+        M = (not combat) and ChooseHandover(cam, QuestSafe) or nil
+        if not M then
+            if not cur then return end
+            M = cur
+            ClampToMap(M, cam)
+        end
+    elseif not combat and M.mapType ~= ns.MAPTYPE_ZONE and now - followZoneT > FOLLOW_ZONE_CHECK then
+        followZoneT = now
+        local B = ChooseHandover(cam, QuestSafe)
+        if B and B.mapType == ns.MAPTYPE_ZONE then M = B end
+    end
+    if still and M == cur then return end -- (nothing moved, the map stays: nothing to do)
+    local switched = M.id ~= WorldMapFrame:GetMapID()
+    SyncReal(M)
+    if switched then FocusRealMap() end
+    restBusy = true
+end
+
+-- (3.5.0) Following while the view is held (BeginSettle: in combat, or no map we may switch to can show it - the
+-- user: "zooming in and out while following, breaks the follow"): the camera goes on with the unit over our overlay,
+-- Blizzard's map stays; out of combat the settle is tried again now and then, in combat when it ends.
+local function FollowHeld(dt, now)
+    if FollowCamera(dt, now) == nil then return end
+    if not InCombatLockdown() and now - followZoneT > FOLLOW_ZONE_CHECK then
+        followZoneT = now
+        BeginSettle()
+    end
+end
+
+local function OnUpdate(_, dt)
+    if not ready or not WorldMapFrame:IsShown() then
+        driver:Hide()
+        return
+    end
+    if dt > 0.1 then dt = 0.1 end
+    local now = GetTime()
+
+    if drag.pending then
+        if not IsMouseButtonDown("LeftButton") then
+            drag.pending = false
+        else
+            local sx, sy = CursorPos()
+            local dx, dy = sx - drag.sx, sy - drag.sy
+            if dx * dx + dy * dy > dragThreshold * dragThreshold and Usable() then
+                drag.pending = false
+                if not drag.fromRest then
+                    -- Our camera kept moving (glide, zoom, flight) while the
+                    -- button was held: grab what is under the press point now.
+                    drag.gx, drag.gy = ScreenToWorldWith(cam, drag.sx, drag.sy)
+                end
+                EnterFree()
+                drag.active = true
+                drag.swallow = true
+                if ns.Follow then ns.Follow:Stop() end -- (3.3.0: a drag takes the map back)
+                drag.wx, drag.wy = drag.gx, drag.gy
+                drag.lastSx, drag.lastSy = sx, sy
+                vel.x, vel.y = 0, 0
+                anchor, restAim = nil, nil
+            end
+        end
+    end
+
+    if state == "free" then
+        UpdateFree(dt, now)
+        if state == "free" then DrawFrame() end
+    elseif state == "fly" then
+        UpdateFly(dt, now)
+        if state == "fly" then DrawFrame() end
+    elseif state == "hold" then
+        local following = ns.Follow and ns.Follow:Active() -- (3.5.0)
+        if following then FollowHeld(dt, now) end
+        if state == "hold" and not DrawFrame() and not drag.pending and not following then driver:Hide() end
+    elseif state == "rest" then
+        if realDirty then
+            -- Blizzard moved its canvas by itself (tiny press-pan, gamepad,
+            -- another addon): follow it so our art stays under the pins.
+            realDirty = false
+            local r = ReadRealView()
+            if r and r.map.id == WorldMapFrame:GetMapID() and DiffersFromCam(r) then
+                cam.x, cam.y, cam.vw = r.x, r.y, r.vw
+                targetVw = cam.vw
+                restBusy = true
+                restAim = nil -- (the view moved under a still cursor: aim afresh)
+            end
+        end
+        local following = ns.Follow and ns.Follow:Active() -- (3.3.0)
+        if following then FollowStep(dt, now) end
+        if restBusy then restBusy = DrawFrame() end
+        if not restBusy and not drag.pending and not realDirty and not following then driver:Hide() end
+    elseif not drag.pending then
+        driver:Hide()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Input & Blizzard hooks
+---------------------------------------------------------------------------
+local function OnMouseWheel(_, delta)
+    if not Usable() or delta == 0 then return end
+    local prev = (state == "free" and anchor) or (state == "rest" and restAim)
+    restAim = nil
+    EnterFree()
+    local sx, sy = CursorPos()
+    if ns.Follow and ns.Follow:Active() then sx, sy = v.W / 2, v.H / 2 end -- (3.3.0: following - zoom about them)
+    local points = { cam.x, cam.y }
+    if drag.active then
+        anchor = nil
+    else
+        local wx, wy = ScreenToWorldWith(cam, sx, sy)
+        points[3], points[4] = wx, wy
+        anchor = { wx = wx, wy = wy, sx = sx, sy = sy, ax = wx, ay = wy, asx = sx, asy = sy }
+        if delta > 0 and depthCity and prev and prev.asx
+            and (sx - prev.asx) ^ 2 + (sy - prev.asy) ^ 2 <= dragThreshold * dragThreshold then
+            -- Another notch in while kept on a city, the cursor still (less
+            -- than a drag's threshold from where the aim was taken): keep
+            -- aiming at the spot the burst started on, which the city's pull
+            -- may have slid away from the cursor (see CityZoom).
+            anchor.ax, anchor.ay, anchor.asx, anchor.asy = prev.ax, prev.ay, prev.asx, prev.asy
+        end
+    end
+    vel.x, vel.y = 0, 0
+
+    local newT = targetVw / (db.zoomStep ^ delta)
+    if delta > 0 then
+        -- Depth limit: maxZoom past the deepest map under the cursor (or the
+        -- centre). Only ever stops further zooming in, never pushes you out.
+        local floor = math.huge
+        for i = 1, #points, 2 do
+            floor = math.min(floor, ns.WidthForZoom(v, DeepestAt(points[i], points[i + 1]), db.maxZoom))
+        end
+        newT = math.max(newT, math.min(floor, targetVw))
+        -- (deeper than a capital's zone goes: the view is kept on the city)
+        EngageCity(points, newT)
+    end
+    targetVw = math.min(newT, 1)
+    lastInput = GetTime()
+    lastWheel = lastInput
+    -- the focus follows where the zoom now heads, at once (not up to 0.08 s later)
+    UpdateFocus(lastInput, true)
+end
+
+local function OnGlobalMouseDown(button)
+    if button ~= "LeftButton" then return end
+    drag.swallow = false
+    if not Usable() then return end
+    -- Only presses on the bare map (or our mouse catcher while it moves) pan;
+    -- presses on Questie icons or other pins behave as usual.
+    local f = MouseFocus()
+    if f ~= container and f ~= container.Child and f ~= overlay and f ~= catcher then return end
+    drag.pending = true
+    drag.fromRest = (state == "rest")
+    if state == "free" then
+        -- Tap to stop a glide.
+        vel.x, vel.y = 0, 0
+        lastInput = GetTime()
+    end
+    drag.sx, drag.sy = CursorPos()
+    -- Grab point from the view *before* Blizzard starts panning its canvas.
+    local base = cam
+    if state == "rest" then base = ReadRealView() or cam end
+    drag.gx, drag.gy = ScreenToWorldWith(base, drag.sx, drag.sy)
+    driver:Show()
+end
+
+local function OnGlobalMouseUp(button)
+    if button ~= "LeftButton" then return end
+    drag.pending = false
+    if drag.active then EndDrag() end
+end
+
+-- Runs before Blizzard turns a canvas click into a map switch. A click that
+-- was really the end of our drag (or lands while we drive the view) is eaten.
+local function OnCanvasClick(_, button)
+    if not ready or not db.enabled then return false end
+    if drag.swallow and button == "LeftButton" then return true end
+    if state == "free" or state == "fly" or state == "hold" then return true end
+    -- (3.3.0, Follow.lua) a click on your arrow or a party member's dot follows them (on the one followed: stops)
+    if state == "rest" and ns.Follow and ns.Follow:OnCanvasClick(button) then return true end
+    -- (Dungeon.lua) a click on a dungeon / raid entrance label opens its maps
+    if state == "rest" and ns.Dungeon and ns.Dungeon:OnCanvasClick(button) then return true end
+    return false
+end
+
+-- Any map change we didn't make (clicking a zone, right-click out, Questie,
+-- the quest log...) becomes a smooth flight to the new map.
+local function OnMapChanged()
+    if syncing or not ready or not WorldMapFrame:IsShown() then return end
+    if not db.enabled then return end
+    if not UpdateView() then return end
+    local target = ReadRealView()
+    if not target then
+        GoOff()
+        return
+    end
+    if state == "off" or justShown then
+        cam.x, cam.y, cam.vw = target.x, target.y, target.vw
+        EnterRest()
+        return
+    end
+    if ns.Follow then ns.Follow:Stop() end -- (3.3.0: a map change we did not make - a zone clicked, the quest log)
+    drag.active = false
+    vel.x, vel.y, anchor, restAim = 0, 0, nil, nil
+    depthCity = nil -- (the landing decides again, see RestCity)
+    StartFly(target, function(f)
+        if f.liveUsed then
+            -- Blizzard's canvas followed the flight (on the map that was
+            -- asked for): line it up with the landing view.
+            local M = ns.GetMap(WorldMapFrame:GetMapID())
+            if M then SyncReal(M) end
+        else
+            -- Blizzard may have moved on while we were flying.
+            local real = ReadRealView()
+            if real then cam.x, cam.y, cam.vw = real.x, real.y, real.vw end
+        end
+        EnterRest()
+    end, true)
+end
+
+-- Maximize/minimize, the quest log panel and UI scale changes resize the map
+-- and make Blizzard reset its zoom. Put the zoom straight back (same frame,
+-- so the reset never shows).
+local function OnFrameSizeChanged()
+    restAim = nil -- (the layout changes: the point under the cursor with it)
+    if not ready or state == "off" or not WorldMapFrame:IsShown() or v.W <= 0 then return end
+    if state == "rest" then
+        local M = ns.GetMap(WorldMapFrame:GetMapID())
+        if not M then return end
+        local z = ns.ZoomOf(v, M, cam.vw) -- measured with the old size
+        local x, y = cam.x, cam.y
+        if not UpdateView() then return end
+        cam.x, cam.y = x, y
+        cam.vw = ns.WidthForZoom(v, M, math.max(z, 1))
+        ClampToMap(M, cam)
+        targetVw = cam.vw
+        syncing = true
+        local ok, err = pcall(SetRealView, RealParams(M, cam))
+        syncing = false
+        if not ok then geterrorhandler()(err) end
+        restBusy = DrawFrame()
+        if restBusy then driver:Show() end
+    else
+        -- Moving: DrawFrame puts Blizzard's canvas back on the camera (live),
+        -- or our overlay hides the reset until the handover re-syncs.
+        UpdateView()
+        anchor = nil
+        if drag.active then
+            -- Keep the grabbed point under the cursor in the new layout.
+            local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
+            local sx, sy = CursorPos()
+            cam.x = drag.wx - (sx - v.W / 2) / ppx
+            cam.y = drag.wy - (sy - v.H / 2) / ppy
+            drag.lastSx, drag.lastSy = sx, sy
+        end
+        if state == "free" then ClampCam(cam) end
+        DrawFrame()
+    end
+end
+
+local function OnCanvasScaleChanged()
+    if ready and overlay then FitLayers() end
+end
+
+local function MarkRealDirty()
+    if syncing or not ready or state ~= "rest" then return end
+    realDirty = true
+    driver:Show()
+end
+
+-- Runs right after the canvas's own OnUpdate. While live, that OnUpdate can
+-- move the canvas after our sync in the same frame (Blizzard's drag-pan
+-- while the button that started a drag at rest is held, its release glide):
+-- put it back under the camera before the frame is drawn. (When our driver
+-- hasn't run yet this frame it syncs anyway, so nothing is done twice.)
+local function AfterCanvasUpdate()
+    if not live or liveT ~= GetTime() or not Moving() or not ready then return end
+    if container:GetCanvasScale() ~= liveS or container:GetCurrentScrollX() ~= liveP
+        or container:GetCurrentScrollY() ~= liveQ then
+        SyncMoving()
+    end
+end
+
+-- (Dungeon.lua) the dungeon view hands the map back and forth with these.
+local function ExportCore()
+    ns.Core = {
+        GoOff = GoOff,
+        ResyncFromReal = ResyncFromReal,
+        State = function() return state end,
+        Cam = function() return cam, v end, -- (3.0.1, ZoomReadout.lua)
+        -- (3.3.0, Follow.lua)
+        CursorPos = CursorPos,
+        JumpToZoom = JumpToZoom,
+        JustShown = function() return justShown end,
+        Wake = function() if ready then driver:Show() end end,
+    }
+end
+
+local function Setup()
+    if ready or not WorldMapFrame or not WorldMapFrame.ScrollContainer then return end
+    if not ns.BuildRegistry() then
+        print("|cff33ccffAzeroth Unrolled|r: couldn't read the world map layout; addon disabled.")
+        return
+    end
+
+    Render, Labels = ns.Render, ns.Labels
+    container = WorldMapFrame.ScrollContainer
+    local interface = (select(4, GetBuildInfo())) or 0
+    fourArgPanZoom = (container.HasZoomLevels ~= nil) or interface >= 16000
+    dragThreshold = fourArgPanZoom and 4 or 3 -- just under Blizzard's click distance
+    blizzWheelMode = container.mouseWheelZoomMode or MAP_CANVAS_MOUSE_WHEEL_ZOOM_BEHAVIOR_FULL or 2
+
+    -- Rest band: below every pin (incl. Blizzard's zone highlight and all of
+    -- Questie's icons) and above the map tiles of Blizzard's canvas.
+    local function PinLevel(kind)
+        if not WorldMapFrame.GetPinFrameLevelsManager then return end
+        local ok, level = pcall(function()
+            return WorldMapFrame:GetPinFrameLevelsManager():GetValidFrameLevel(kind)
+        end)
+        if ok and type(level) == "number" and level > 0 and level < 8000 then return level end
+    end
+    local lowestPin = PinLevel("PIN_FRAME_LEVEL_DEFAULT") or 2000
+    local exploration = PinLevel("PIN_FRAME_LEVEL_MAP_EXPLORATION")
+    if exploration and exploration < lowestPin then lowestPin = exploration end
+    restStageCap = lowestPin - 1
+    restLevel = restStageCap - REST_BAND
+    local childLevel = container.Child and container.Child:GetFrameLevel() or 0
+    if restLevel <= childLevel then restLevel = childLevel + 1 end
+    if restStageCap < restLevel then restStageCap = restLevel end
+    labelsRestLevel = (exploration or 2002) + 12
+    -- Pictures that must draw over the real map's explored areas at rest:
+    -- above the exploration pin, below the zone hover highlight and the
+    -- labels. (The levels in between belong to the Plunderstorm, event
+    -- overlay, garrison, fog-of-war and quest/scenario blob pins -
+    -- Blizzard_WorldMap.lua AddStandardDataProviders; lifted pictures take
+    -- the lowest ones first.)
+    local highlight = PinLevel("PIN_FRAME_LEVEL_MAP_HIGHLIGHT")
+    if exploration and highlight and highlight - 1 >= exploration + 2 and highlight <= labelsRestLevel then
+        liftLo, liftHi = exploration + 1, highlight - 1
+    end
+    -- (3.1.1) The pictures that must draw over Blizzard's own map art - the city / detail maps, a home zone's banner
+    -- cover, a picture stacked above the real map's explored pieces - live in their own clipping frame, the city layer.
+    -- In the client a frame that clips its children draws them as ONE block at its own place among its siblings: lifted
+    -- inside the overlay they never got above the canvas' pins, and the real map's explored areas (Dun Morogh's
+    -- IRONFORGE banner, Alterac's DALARAN) or a continent map's zone hover highlight covered the cities. The layer sits
+    -- right above the highlight (the levels of Blizzard's debug pins), under every icon pin and our labels.
+    if liftLo then
+        cityLevel = (highlight or liftHi) + 1
+        if cityLevel >= labelsRestLevel then cityLevel = labelsRestLevel - 1 end
+        cityLevelZone = liftLo -- (3.1.2: over a zone map, see SetOverlayMode)
+    end
+
+    overlay = CreateFrame("Frame", nil, container)
+    ns.SetLevelFixed(overlay, restLevel)
+    overlay.level = restLevel
+    overlay:SetAllPoints(container)
+    overlay:SetClipsChildren(true)
+    overlay:EnableMouse(false)
+    overlay.mouse = false
+    overlay:Hide()
+
+    labelLayer = CreateFrame("Frame", nil, container)
+    ns.SetLevelFixed(labelLayer, labelsRestLevel)
+    labelLayer.level = labelsRestLevel
+    labelLayer:SetAllPoints(container)
+    labelLayer:SetClipsChildren(true)
+    labelLayer:EnableMouse(false)
+
+    -- (3.1.1) the city layer (see above); shown and hidden with the overlay
+    cityLayer = CreateFrame("Frame", nil, container)
+    ns.SetLevelFixed(cityLayer, cityLevel or restLevel)
+    cityLayer.level = cityLevel or restLevel
+    cityLayer:SetAllPoints(container)
+    cityLayer:SetClipsChildren(true)
+    cityLayer:EnableMouse(false)
+    cityLayer:SetShown(overlay:IsShown())
+    overlay:HookScript("OnShow", function() cityLayer:Show() end)
+    overlay:HookScript("OnHide", function() cityLayer:Hide() end)
+
+    -- Invisible, above every pin: takes the mouse while the map moves.
+    catcher = CreateFrame("Frame", nil, container)
+    ns.SetLevelFixed(catcher, CATCHER_LEVEL)
+    catcher:SetAllPoints(container)
+    catcher:EnableMouse(true)
+    catcher:Hide()
+
+    driver = CreateFrame("Frame")
+    driver:Hide()
+    driver:SetScript("OnUpdate", OnUpdate)
+
+    Render:Init(overlay)
+    if Render.SetCityLayer then Render:SetCityLayer(cityLayer) end
+    Labels:Init(labelLayer)
+    if ns.Doors then ns.Doors:Merge() end -- (3.0.0: the doors of Doors.lua - Forever rows, placeholders, learned doors)
+    Labels:Build()
+    if ns.Doors then ns.Doors:Attach() end -- (their icons: placeholders, learned doors, the "you are inside" door)
+    SetOverlayMode(false)
+
+    hooksecurefunc(WorldMapFrame, "OnMapChanged", OnMapChanged)
+    if WorldMapFrame.OnFrameSizeChanged then
+        hooksecurefunc(WorldMapFrame, "OnFrameSizeChanged", OnFrameSizeChanged)
+    end
+    if WorldMapFrame.OnCanvasScaleChanged then
+        hooksecurefunc(WorldMapFrame, "OnCanvasScaleChanged", OnCanvasScaleChanged)
+        hooksecurefunc(WorldMapFrame, "OnCanvasScaleChanged", MarkRealDirty)
+    end
+    if WorldMapFrame.OnCanvasPanChanged then
+        hooksecurefunc(WorldMapFrame, "OnCanvasPanChanged", MarkRealDirty)
+    end
+    if WorldMapFrame.AddCanvasClickHandler then
+        WorldMapFrame:AddCanvasClickHandler(OnCanvasClick, 100)
+    end
+    container:HookScript("OnMouseWheel", OnMouseWheel)
+    -- (as Blizzard_GamepadSmartNavigation/Debug.lua:67 hooks an OnUpdate)
+    container:HookScript("OnUpdate", AfterCanvasUpdate)
+    WorldMapFrame:HookScript("OnShow", function()
+        hideGen = hideGen + 1
+        justShown = true
+        ResyncFromReal()
+        C_Timer.After(0, function() justShown = false end)
+    end)
+    WorldMapFrame:HookScript("OnHide", function()
+        GoOff()
+        hideGen = hideGen + 1
+        local gen = hideGen
+        C_Timer.After(RELEASE_DELAY, function()
+            if gen == hideGen and not WorldMapFrame:IsShown() then Render:ReleaseAll() end
+        end)
+    end)
+
+    ready = true
+    ExportCore()
+    if WorldMapFrame:IsShown() then ResyncFromReal() end
+    if ns.Dungeon then ns.Dungeon:Setup() end
+    if ns.Follow then ns.Follow:Setup() end -- (3.3.0: the M key)
+end
+
+---------------------------------------------------------------------------
+-- Slash commands
+---------------------------------------------------------------------------
+local function Print(msg)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffAzeroth Unrolled|r: " .. msg)
+end
+
+local function OnOff(b) return b and "|cff40ff40on|r" or "|cffff4040off|r" end
+
+local function Refresh()
+    if not ready or not WorldMapFrame:IsShown() then return end
+    if ns.Dungeon and ns.Dungeon:Refresh() then return end -- (the dungeon view owns the map)
+    if not db.enabled then
+        GoOff()
+    elseif state == "off" or state == "rest" then
+        ResyncFromReal()
+    else
+        DrawFrame()
+    end
+end
+
+SLASH_AZEROTHUNROLLED1 = "/unroll"
+SLASH_AZEROTHUNROLLED2 = "/azerothunrolled"
+SlashCmdList.AZEROTHUNROLLED = function(input)
+    local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
+    local num = tonumber(arg)
+    if ns.Options and ns.Options:Slash(cmd, arg, num) then
+        -- (Azeroth Unrolled 1.0.0, Options.lua: on / off / toggle, depth, step, speed, labels, names, icons, rest, flight,
+        -- mosaic, cells, livepins, dungeons, markers, bosses, button, reset - the one path the commands, the map menu
+        -- and the Settings page share)
+    elseif cmd == "doors" then
+        if ns.Doors then ns.Doors:Slash(arg) else Print("doors: not available") end
+    elseif cmd == "zoom" or cmd == "cityzoom" or cmd == "cavezoom" then
+        if ns.ZoomReadout then
+            ns.ZoomReadout:Slash(cmd, num, Print, arg)
+            if ready then Refresh() end
+        else
+            Print("zoom: not available")
+        end
+    elseif cmd == "follow" or cmd == "openzoom" or cmd == "openfollow" then
+        if ns.Follow then ns.Follow:Slash(cmd, num, Print, arg) else Print(cmd .. ": not available") end
+    elseif cmd == "taint" then
+        -- (3.3.1) Did a map switch of ours put quest objects into Blizzard's quest cache (QuestSafe)?
+        local cache, n, mine, list = QuestCache and QuestCache.objects, 0, 0, {}
+        if type(cache) == "table" and issecurevariable then
+            for q, o in pairs(cache) do
+                n = n + 1
+                local secure, by = issecurevariable(o, "questID")
+                if not secure then
+                    mine = mine + 1
+                    if #list < 10 then list[#list + 1] = ("%s (%s)"):format(tostring(q), tostring(by)) end
+                end
+            end
+            Print(("quest cache: %d quests, %d tainted%s"):format(n, mine, mine > 0 and (": " .. table.concat(list, ", ")) or ""))
+        else
+            Print("quest cache: not in this client")
+        end
+        local d = QuestMapFrame and QuestMapFrame.DetailsFrame
+        if d and issecurevariable then
+            local secure, by = issecurevariable(d, "questID")
+            Print("quest log details: " .. (secure and "clean" or ("tainted by " .. tostring(by))))
+        end
+    elseif cmd == "debug" then
+        if not ready then Print("not set up yet") return end
+        local child = container.Child
+        local function Where(f)
+            local p = f:GetParent()
+            return (p == child and "in canvas") or (p == container and "beside canvas") or "elsewhere"
+        end
+        local function Info(f)
+            if not f then return "none" end
+            return ("%s level %d %s alpha %.2f scale %.3f"):format(f:GetFrameStrata(), f:GetFrameLevel(),
+                f:IsShown() and "shown" or "hidden", f:GetAlpha(), f:GetEffectiveScale())
+        end
+        Print(("state %s%s, map %s, canvas scale %.3f"):format(state, (Moving() and (live and " (live)" or " (detached)")) or "",
+            tostring(WorldMapFrame:GetMapID()), container:GetCanvasScale() or 0))
+        Print("map frame: " .. Info(WorldMapFrame))
+        Print("canvas: " .. Info(child))
+        Print("art: " .. Info(overlay) .. ", " .. Where(overlay))
+        Print("labels: " .. Info(labelLayer) .. ", " .. Where(labelLayer))
+        local n, lo, hi, strata = 0
+        pcall(function()
+            for _, pool in pairs(WorldMapFrame.pinPools or {}) do
+                for pin in pool:EnumerateActive() do
+                    if pin:IsShown() then
+                        n = n + 1
+                        local l = pin:GetFrameLevel()
+                        lo, hi = math.min(lo or l, l), math.max(hi or l, l)
+                        strata = strata or pin:GetFrameStrata()
+                    end
+                end
+            end
+        end)
+        Print(("pins shown: %d, levels %s-%s, strata %s"):format(n, tostring(lo), tostring(hi), tostring(strata)))
+        if ns.Dungeon then Print(ns.Dungeon:DebugLine()) end
+    else
+        Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s, flight: %s) | dungeons %s"):format(
+            OnOff(db.enabled), db.maxZoom, db.zoomStep, db.flySpeed,
+            OnOff(db.labels), OnOff(db.labelsAtRest), OnOff(db.flightPaths), OnOff(db.dungeons)))
+        Print("/unroll on | off")
+        Print("/unroll depth <1-10>   how far past a zone you can zoom")
+        Print("/unroll step <1.05-2>  zoom per wheel notch")
+        Print("/unroll speed <0.25-4> click flight speed")
+        Print("/unroll labels | rest | flight   toggle place labels")
+        Print("/unroll mosaic        toggle unexplored zone land (map-style mosaic)")
+        Print("/unroll cells         toggle seamless zone cells (off: land shapes only)")
+        Print("/unroll livepins      toggle map icons moving with the map (off: hidden while moving)")
+        Print("/unroll dungeons      toggle dungeon maps (click a dungeon label; opens inside dungeons)")
+        Print("/unroll markers       group on entrance maps: the game's own widget / addon dots")
+        Print("/unroll bosses        toggle boss and entrance markers on dungeon maps")
+        Print("/unroll doors         list the doors (hints [on|off]: placeholders; forget [id]: learned doors)")
+        Print("/unroll zoom          toggle a zoom readout on the map (world zoom: 1.00x = the whole world map)")
+        Print(("/unroll cityzoom <N>  world zoom from which the city maps show (default %.2f; off: 1.5x of each city's own zone)"):format(ns.Render.CITY_G))
+        Print(("/unroll cavezoom <N>  world zoom from which the caves show (%d to %d, default %d; off: never)"):format(
+            ns.Render.CAVE_G_MIN, ns.Render.CAVE_G_MAX, ns.Render.CAVE_G))
+        Print("/unroll follow        toggle following a character when you click their arrow / dot on the map")
+        Print("/unroll openzoom <N>  the world zoom M opens the map at, on your character (default 14; off: as the game does)")
+        Print("/unroll openfollow    toggle M also following you (default on)")
+        Print("/unroll taint         check that the map left the objective tracker's quest data clean")
+        Print("/unroll debug         show how the map layers are stacked")
+        Print("/unroll reset")
+        if ns.Options then ns.Options:Help() end -- (Options.lua: names, icons, button)
+    end
+end
+
+-- (Azeroth Unrolled 1.0.0) what Options.lua and MapMenu.lua need of this file: the defaults (Options.lua adds its own rows:
+-- placeNames, dungeonIcons, mapButton), the chat printer, the redraw, the command handler and its first slash word.
+ns.DEFAULTS, ns.Print, ns.Refresh = DEFAULTS, Print, Refresh
+ns.RunCommand, ns.COMMAND = SlashCmdList.AZEROTHUNROLLED, SLASH_AZEROTHUNROLLED1
+
+---------------------------------------------------------------------------
+-- Events
+---------------------------------------------------------------------------
+local events = CreateFrame("Frame")
+events:RegisterEvent("ADDON_LOADED")
+events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("MAP_EXPLORATION_UPDATED")
+events:RegisterEvent("PLAYER_REGEN_ENABLED")
+events:RegisterEvent("GLOBAL_MOUSE_DOWN")
+events:RegisterEvent("GLOBAL_MOUSE_UP")
+events:SetScript("OnEvent", function(_, event, arg1)
+    if event == "GLOBAL_MOUSE_DOWN" then
+        if ready then OnGlobalMouseDown(arg1) end
+    elseif event == "GLOBAL_MOUSE_UP" then
+        if ready then OnGlobalMouseUp(arg1) end
+    elseif event == "ADDON_LOADED" then
+        if arg1 == ADDON then
+            AzerothUnrolledDB = AzerothUnrolledDB or {}
+            db = AzerothUnrolledDB
+            -- (3.1.0) The city switch is ONE world zoom by default. What 3.0.1 saved (false: its default, never a choice;
+            -- or a trial number of its tuning aid) gives way to the default once; later /unroll cityzoom choices are kept.
+            if db.cityZoomRev ~= 310 then db.cityZoom, db.cityZoomRev = nil, 310 end
+            -- (3.6.1) The same for the caves: every default is written into the saved settings below, so a changed default
+            -- reaches nobody who ran the old one (3.4.0 / 3.5.0 left their 20, 3.6.1 its 52 - or a zoom picked in its
+            -- test). Each new cave default (3.6.2: 30) bumps this stamp: what was saved gives way to it once (with the
+            -- zoom Azeroth Unrolled's caves button remembered); later /unroll cavezoom choices are kept.
+            if db.caveZoomRev ~= 362 then db.caveZoom, db.caveZoomWas, db.caveZoomRev = nil, nil, 362 end
+            for k, val in pairs(DEFAULTS) do
+                if db[k] == nil then db[k] = val end
+            end
+            if db.cityZoom ~= false and type(db.cityZoom) ~= "number" then db.cityZoom = DEFAULTS.cityZoom end
+            if db.caveZoom ~= false and type(db.caveZoom) ~= "number" then db.caveZoom = DEFAULTS.caveZoom end -- (3.4.0)
+            ns.db = db -- (ZoomReadout:Apply gives the renderer the saved switches at login)
+        elseif arg1 == "Blizzard_WorldMap" and IsLoggedIn() then
+            Setup()
+        end
+    elseif event == "PLAYER_LOGIN" then
+        Setup()
+    elseif event == "MAP_EXPLORATION_UPDATED" then
+        if ready then
+            Render:MarkArtDirty()
+            if state == "rest" or state == "hold" then
+                restBusy = true
+                driver:Show()
+            end
+        end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        if ready and state == "hold" and WorldMapFrame:IsShown() then
+            BeginSettle()
+        end
+    end
+end)
