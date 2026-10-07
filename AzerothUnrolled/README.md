@@ -1,6 +1,6 @@
 # Azeroth Unrolled
 
-Version 1.2.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.3.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 One continuous zoom over the whole world map: scroll from Azeroth straight down to a
@@ -15,10 +15,19 @@ dungeon entrance, drag across zone borders, and see the important places along t
   draws them). Below one zoom level the map is Blizzard's own drawing of every zone, city banners
   included; above it (world zoom 14.05x, `/unroll cityzoom`) every capital shows its own map, on top of
   everything, wherever you look. Deep zoom stays inside maps that have the detail for it.
-- Map icons (quests, Questie, flight masters...) move with the map. At rest everything the addon draws
-  sits *inside* Blizzard's map canvas, below every pin, so every icon stays clickable.
-- Click your arrow (or a party member's dot) and the map follows them; M opens the map on your character at
-  world zoom 14, and follows you.
+- Map icons (quests, Questie, flight masters...) move with the map. At rest everything the addon draws on the map
+  sits *inside* Blizzard's map canvas, below every pin, so every icon stays clickable (only its round buttons and the
+  party bubbles lie above it).
+- Click your arrow (or a party member's dot) and the map follows them - if they take a portal or their hearthstone,
+  the map flies after them; M opens the map on your character at world zoom 14, and follows you.
+- Party bubbles: you and your party (in a raid: your own group) as small round portraits in the map's top left corner,
+  under the map-pin button (WoW Forever). Hover one for the zone they are in; click it and the map flies to them - out, across and
+  back in - and follows them (click it again to stop). The bubble of the one followed glows; offline or dead members
+  are greyed.
+- *Forever:* minimap imagery: the whole world map drawn from the game's own minimap pictures - the real terrain, from
+  the whole world down to the deepest zoom - instead of the drawn map (the round button left of the caves button, or
+  `/unroll imagery`; off by default). Land you have not explored is greyed as you zoom in on a continent; zone, city
+  and explored sub-zone names stay on the map; Ironforge's and Undercity's city maps still show (they are underground).
 - Every cave and mine of the old world (about 290) shows its tunnels from world zoom 30 - or as deep as the map goes
   over it, where that is less; Gnomeregan's tunnels, Maraudon, the Scarlet Monastery and the Timbermaw Hold tunnels
   with the city maps.
@@ -51,7 +60,7 @@ dungeon entrance, drag across zone borders, and see the important places along t
 - Inside an instance: the room the game names (its sub-zone text) is lit and labelled, and the bar
   names it.
 
-**Doors on the world map** (*Forever*, new in 3.0.0)
+**Doors on the world map** (*Forever*)
 - Door icons for Forever's own instances: The Hall of Thanes (Ironforge), Ruins of Lordaeron (Tirisfal),
   Excavation Site: Wetlands (Wetlands). City of Dalaran's dungeon door (the portal at the end of the
   sewer pipe) has an icon too; its tooltip says the door is not confirmed yet.
@@ -76,7 +85,8 @@ dungeon entrance, drag across zone borders, and see the important places along t
 
 A small round button in the map's lower right corner (the treasure-map icon) opens the settings: tick what you want
 to see, pick the zoom behaviour under "Zoom". Left of it, the caves button (a mining pick) hides and shows the caves
-with one click. The same settings are on the game's own page Esc > Options > AddOns > Azeroth Unrolled (plus "Buttons
+with one click; left of that (*Forever*) the imagery button switches between the drawn map and the minimap imagery - its
+picture shows the other look, and it glows while the imagery is on. The same settings are on the game's own page Esc > Options > AddOns > Azeroth Unrolled (plus "Buttons
 on the map", to bring hidden buttons back), and every one of them has a slash command.
 
 | Menu item | What it does |
@@ -90,6 +100,8 @@ on the map", to bring hidden buttons back), and every one of them has a slash co
 | Map icons move with the map | quest and other icons follow the map while it moves |
 | Follow on click | a click on your arrow or a party member's dot: the map follows them |
 | M follows me | M opens the map on your character and follows you |
+| Party bubbles | you and your party (in a raid: your group) in the map's top left corner: hover for their zone, click to go to them and follow them |
+| Minimap imagery | *Forever:* the map drawn from the game's own minimap pictures instead of the drawn map; unexplored land greyed (off by default) |
 | Zoom readout | the zoom numbers in the map's top left corner |
 | Zoom > Wheel step | zoom per wheel notch: 1.15x, 1.3x (default), 1.5x, 2x |
 | Zoom > Zoom depth | how far past a zone's own map: 2x, 4x (default), 6x, 10x |
@@ -99,7 +111,7 @@ on the map", to bring hidden buttons back), and every one of them has a slash co
 | Zoom > M opens the map on me | at world zoom 10x, 14x (default) or 20x on your character, or off (the game's view) |
 | Slash commands | prints every command to the chat |
 | Reset to defaults | every setting back to its default (learned doors are kept) |
-| Hide these buttons | both buttons; `/unroll button` or the Settings page brings them back |
+| Hide these buttons | the round buttons on the map (settings, caves, *Forever:* imagery); `/unroll button` or the Settings page brings them back |
 
 Any other allowed value can still be typed as a command (`/unroll step 1.4`, `/unroll cityzoom 16`); the menu then
 shows it as "Custom".
@@ -113,11 +125,11 @@ shows it as "Custom".
 | `/unroll on`, `/unroll off` | the smooth zoom on / off (Blizzard's map as usual when off) |
 | `/unroll depth <1-10>` | how far past a zone's own map you can zoom (default 4) |
 | `/unroll step <1.05-2>` | zoom per wheel notch (default 1.3) |
-| `/unroll speed <0.25-4>` | speed of click flights (default 1) |
-| `/unroll labels` / `rest` / `flight` | place names on / off; names while the map is still; flight masters |
+| `/unroll speed <0.25-4>` | speed of the map's flights - a click on a zone, a party bubble, following someone through a portal (default 1) |
+| `/unroll labels` / `rest` / `flight` | place names and dungeon icons together on / off; the addon's names and icons while the map is still; flight-master names |
 | `/unroll names` | place names on / off |
 | `/unroll icons` | dungeon and raid icons on the world map on / off |
-| `/unroll button` | the buttons on the map (settings, caves) on / off |
+| `/unroll button` | the buttons on the map (settings, caves, *Forever:* imagery) on / off |
 | `/unroll mosaic` | unexplored zone land in map style (mosaic) on / off |
 | `/unroll cells` | seamless zone cells (off: land shapes only) |
 | `/unroll livepins` | map icons move with the map (off: hidden while it moves) |
@@ -128,10 +140,12 @@ shows it as "Custom".
 | `/unroll doors hints [on\|off]` | the placeholders on / off (default on) |
 | `/unroll doors forget [id]` | clear the learned doors (all, or one instance ID) |
 | `/unroll zoom` | a zoom readout on the map: the world zoom (1.00x = the whole world map) and each city in view |
-| `/unroll cityzoom <N>`, `default`, `off` | the world zoom from which every city map (and Blackrock Mountain, Dalaran) shows, wherever the view is: default 14.05; off = the rule up to 3.0.1 (1.5x of each city's own zone) |
+| `/unroll cityzoom <N>`, `default`, `off` | the world zoom from which every city map (and Blackrock Mountain, Dalaran) shows, wherever the view is: default 14.05; off = the per-zone rule (each city at 1.5x of its own zone) |
 | `/unroll follow` | a click on your arrow / a party member's dot makes the map follow them: on / off (default on) |
 | `/unroll openzoom <N>`, `default`, `off` | the world zoom M opens the map at, on your character: default 14; off = the game's own view |
 | `/unroll openfollow` | M also follows you: on / off (default on) |
+| `/unroll bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
+| `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
 | `/unroll taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/unroll debug` | how the map layers are stacked (for bug reports) |
@@ -166,6 +180,10 @@ Everything the addon draws comes from data files inside the addon (no network ac
 - `DungeonPortals.lua`, `DungeonLinks.lua`, `DetailMaps.lua`, `SubZoneRegions.lua`, `OverlayData.lua`,
   `ZoneMasks.lua` + `Masks\` - portals of the entrance maps, level links, detail levels, room shapes,
   explored-area data, zone masks.
+- `Caves.lua` + `Masks\cave*` - the caves of the old world (generated; do not edit by hand).
+- `MinimapData.lua` + `Media\Minimap\` + `Masks\sea_*` - the minimap imagery (*Forever*): its overview pictures
+  (scaled-down composites of the client's own minimap tiles), the client tiles' file IDs, the open sea's masks and
+  colour, sub-zone names (generated; do not edit by hand).
 
 Sources, with thanks:
 - **The WoW Forever client itself** (read-only): its DB2 tables (Map, UiMap, UiMapAssignment,
@@ -187,7 +205,8 @@ Sources, with thanks:
 
 ## After a client patch: checking and refreshing the data
 
-The data is tied to client build 1.60.1.70124. After a patch:
+The data was read from client builds 1.60.1.70009 to 70235 (each data file's header names its build) and checked in
+game on 1.60.1.70245. After a patch:
 1. **Check that it loads**: open the map, `/unroll debug`. A Lua error names the file.
 2. **New instances** (a placeholder whose map is now in the game): their `Map.db2` rows were encrypted
    in 70124. When a patch unlocks them, the instance can get a map page (built from its minimap art
@@ -207,14 +226,14 @@ The data is tied to client build 1.60.1.70124. After a patch:
 5. **Dungeon art**: the map art is drawn by file ID; if Blizzard replaces a file, the page shows
    nothing for that tile (no error) - re-read the UiMapArtTile rows for the new IDs.
 
-The generator tools used for 3.0.0 (DB2 readers, the boss / door table builders, the test harness that
-runs the real addon files against Blizzard's map code) were kept outside the addon folder.
+The generator tools (DB2 readers, the boss / door table builders, the test harness that runs the real addon files
+against Blizzard's map code) are kept outside the addon folder.
 
 ## Tests before this release
 
 This release was built and checked in the offline harness of the earlier versions, which runs the addon's real
-files against Blizzard's own map canvas code (Lua 5.1 limits enforced; the 93 test suites of 3.6.2, plus suites
-for the settings and caves buttons, the menu and the Settings page; image dumps).
+files against Blizzard's own map canvas code (Lua 5.1 limits enforced; the 96 test runs of 1.3.0 - party bubbles, the flights and
+the minimap imagery among them - plus suites for the settings, caves and imagery buttons, the menu and the Settings page; image dumps).
 Things only the game can confirm
 (please report): the boss-marker art and the kill events in Forever, the placeholder spots, the City of
 Dalaran door (stand at the portal at the end of the sewer pipe: `/run print(UnitPosition("player"))`
@@ -227,5 +246,6 @@ Azeroth Unrolled is free software under the GNU General Public License, version 
 (SPDX: `GPL-3.0-or-later`); it comes WITHOUT ANY WARRANTY. The full text is in `LICENSE`; data sources and
 third-party notices are in `NOTICE.md`.
 
-By Hadlock. Blizzard's art and data belong to Blizzard Entertainment; the addon only points the game
-at files already in your client.
+By Hadlock. Blizzard's art and data belong to Blizzard Entertainment; the addon draws the files already in your
+client, and carries only pictures derived from them: the minimap imagery's overview pictures (`Media\Minimap\`) and
+the masks in `Masks\` (see `NOTICE.md`).

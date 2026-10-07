@@ -1,14 +1,16 @@
 --[[
-Azeroth Unrolled - Follow.lua (3.3.0)
+Azeroth Unrolled - Follow.lua (1.1.0)
 
 Two ways to put a character in the middle of the map (the user, 2026-10-05):
   * Click your own arrow, or a party / raid member's dot, on the world map: the map follows them. It pans with them,
     keeps them centred and changes to the map that can show the view as they cross zones (Core.lua FollowStep). The
     wheel still zooms - about them; dragging the map, clicking a zone, closing the map or clicking them again stops
     it. "Following <name>" shows at the top of the map meanwhile. /unroll follow switches the click off and on.
+    (1.3.0) Where they get two views away at once - a portal, a hearthstone, also in the middle of a wheel zoom - the
+    map flies to them (Core.lua FollowFar) instead of jumping.
   * The M key (ToggleWorldMap): the map opens on your character at world zoom 14.00 (ns.WorldZoom: 1.00x = the whole
     world map) instead of the game's view of your zone. /unroll openzoom <1-25> sets the zoom, off = the game's view.
-    (3.4.0, the user: "lets default following you when you open map") and follows you: /unroll openfollow.
+    (1.2.0, the user: "lets default following you when you open map") and follows you: /unroll openfollow.
 Positions: UnitPosition (UnitDocumentation.lua; plain numbers only - a secret value or an error is no position) on
 the continent's own map (C_Map.GetMapPosFromWorldPos with the continent as the override) -> the camera's world units.
 Inside instances the game gives no position: nothing to follow there, and M opens as the game does.
@@ -141,6 +143,7 @@ end
 ---------------------------------------------------------------------------
 function F:Active() return unit ~= nil end
 function F:Unit() return unit end
+function F:GUID() return guid end -- (1.3.0, PartyBubbles.lua: who is followed, whatever token they have this frame)
 function F:LabelText() return label and label:IsShown() and labelText:GetText() or nil end
 
 function F:Start(u, quiet)
@@ -148,14 +151,16 @@ function F:Start(u, quiet)
     local ok, n = pcall(UnitName, u)
     name = (u == "player" and "you") or ((ok and Str(n)) and n) or u
     ShowLabel(true)
-    if u == "player" and not quiet then Ping() end -- (3.4.0 quiet: M - the game pings your arrow as the map opens)
+    if u == "player" and not quiet then Ping() end -- (1.2.0 quiet: M - the game pings your arrow as the map opens)
     if ns.Core and ns.Core.Wake then ns.Core.Wake() end
+    if ns.Bubbles then ns.Bubbles:OnFollowChanged() end -- (1.3.0, PartyBubbles.lua: the glow on their bubble)
 end
 
 function F:Stop()
     if not unit then return end
     unit, guid, name, lostSince, lastX, lastY = nil, nil, nil, nil, nil, nil
     ShowLabel(false)
+    if ns.Bubbles then ns.Bubbles:OnFollowChanged() end -- (1.3.0)
 end
 
 -- The token of the unit followed now (a party token moves when someone leaves the group; nil: gone).
@@ -182,7 +187,10 @@ function F:Target(now)
         self:Stop()
         return
     end
-    unit = u
+    if u ~= unit then
+        unit = u
+        if ns.Bubbles then ns.Bubbles:OnFollowChanged() end -- (1.3.0: the same one under a new token - the glow checks)
+    end
     local x, y = self:Position(u)
     if x then
         lostSince = nil
@@ -220,7 +228,7 @@ local function AfterToggle()
     if ns.Dungeon and ns.Dungeon.IsActive and ns.Dungeon:IsActive() then return end
     local x, y = F:Position("player")
     if x and core.JumpToZoom(x, y, db.openZoom) and db.openFollow ~= false then
-        F:Start("player", true) -- (3.4.0: and follows you)
+        F:Start("player", true) -- (1.2.0: and follows you)
     end
 end
 

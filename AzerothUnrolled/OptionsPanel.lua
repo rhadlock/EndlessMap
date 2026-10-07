@@ -18,7 +18,7 @@ local P = {}
 ns.OptionsPanel = P
 
 local TITLE = ns.TITLE or "Azeroth Unrolled" -- (Options.lua)
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "zoomReadout", "mapButton" }
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton" } -- (1.3.0: + bubbles, imagery)
 local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "openZoom" }
 local NONE = 0 -- (a dropdown value must be a number: stands for cityZoom = false)
 
@@ -39,7 +39,7 @@ local function Register()
 
     for _, key in ipairs(TOGGLES) do
         local s = O:Spec(key)
-        if s then
+        if s and not (s.avail and not s.avail()) then -- (1.3.0: avail - the imagery, WoW Forever only)
             local setting = St.RegisterProxySetting(category, "AZEROTHUNROLLED_" .. key:upper(), St.VarType.Boolean, s.label,
                 O:Default(key) == true,
                 function() return O:Get(key) == true end,

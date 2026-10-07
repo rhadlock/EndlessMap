@@ -1,7 +1,7 @@
 local _, ns = ...
 
 --[[
-Doors (3.0.0, WoW Forever only): the world-map side of the instances.
+Doors (1.0.0, WoW Forever only): the world-map side of the instances.
 
   * Placeholders: one icon for every instance Forever lists that is not in this
     client's files yet (ns.FOREVER_DOOR_HINTS, DungeonMapsMM.lua), at the best
@@ -62,8 +62,8 @@ local PULSE = 1.2          -- s per pulse of the "you are inside" icon
 local LOG_N = 6            -- recent recorder decisions kept for /unroll doors
 -- Switch: a click on the "you are inside" door opens the instance's own map (its floors, on the floor the game names) instead
 -- of the door's fixed page. Off: the door opens what it always opens (for a door with one dungeon that is the dungeon's
--- map; Blackrock Mountain's opens its entrance map) - since 2.6.0 nothing is picked from the player's whereabouts.
--- (wf17 judge: on - the lead's D5 "clicking opens the dungeon map"; the instance ID is the game's, not a guess, and only
+-- map; Blackrock Mountain's opens its entrance map) - nothing is picked from the player's whereabouts.
+-- (review: on - "clicking opens the dungeon map"; the instance ID is the game's, not a guess, and only
 -- the marked door follows it: inside Blackrock Depths the Blackrock Mountain door opens Blackrock Depths, inside Dire
 -- Maul's Warpwood Quarter the Dire Maul door opens that floor)
 local HERE_OPENS_INSTANCE = true
@@ -119,7 +119,7 @@ end
 local function DB(create)
     local db = ns.db
     if not db then return end
-    -- (review2) anything but a table there (a broken or foreign SavedVariables file) is no list of doors: ignored, and
+    -- (review) anything but a table there (a broken or foreign SavedVariables file) is no list of doors: ignored, and
     -- replaced by an empty one when a sample is recorded - it must never stop the addon's Setup (Merge runs in it)
     if type(db.doors) ~= "table" then
         if not create then return end
@@ -128,7 +128,7 @@ local function DB(create)
     return db.doors
 end
 
--- (review2) a saved sample the addon can compute with (anything else in a saved file is skipped, never an error)
+-- (review) a saved sample the addon can compute with (anything else in a saved file is skipped, never an error)
 local function Good(s) return type(s) == "table" and type(s.c) == "number" and type(s.x) == "number" and type(s.y) == "number" end
 
 ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ local function SlotOf(id)
 end
 
 -- The hint an entry sample of instance id is near (HINT_YD): hints for exactly that instance first; unknown-instance
--- hints (m = nil) only for an instance nothing else claims. (review2) Of those, the one named like the instance (the
+-- hints (m = nil) only for an instance nothing else claims. (review) Of those, the one named like the instance (the
 -- game's name) first, then the one with the nearest point - never simply the first in the list: Hyjal Summit's and
 -- Barrow Deeps' points lie 136 yd apart. Second return: the hint is the instance's own (by ID or by name).
 local function HintNear(id, a, name)
@@ -278,7 +278,7 @@ end
 -- without one). Returns the slots whose icon changes, and those newly confirmed.
 local function Resolve()
     for _, slot in ipairs(S.slots) do slot.was, slot.learned, slot.lid, slot.nsamp = slot.learned, nil, nil, nil end
-    -- (review2) the confirmed doors first, then their slots: instances a slot belongs to by ID or by name before the
+    -- (review) the confirmed doors first, then their slots: instances a slot belongs to by ID or by name before the
     -- others, then by instance ID - one slot per instance whatever order the saved table comes in; the hint a door is
     -- near picks the placeholder however the door was confirmed (by a pair, or by that hint)
     local todo = {}
@@ -698,7 +698,7 @@ function Doors:Slash(rest)
     elseif cmd == "forget" then
         local db = DB()
         local id = tonumber(arg)
-        if not id and arg ~= "" and arg ~= "all" then -- (review2: not an instance ID - nothing is forgotten, and it says so)
+        if not id and arg ~= "" and arg ~= "all" then -- (review: not an instance ID - nothing is forgotten, and it says so)
             Print("/unroll doors forget [id]: " .. arg .. " is no instance ID (/unroll doors lists them) - nothing forgotten")
             return
         end

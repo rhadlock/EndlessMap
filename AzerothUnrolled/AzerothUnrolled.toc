@@ -2,7 +2,7 @@
 ## Title: Azeroth Unrolled
 ## Notes: One smooth zoom over the whole world map, from Azeroth down to a dungeon door, with dungeon and raid maps, bosses and entrances. Settings: the round button on the map, or /azerothunrolled.
 ## Author: Hadlock
-## Version: 1.2.0
+## Version: 1.3.0
 ## SavedVariables: AzerothUnrolledDB
 ## X-License: GPL-3.0-or-later
 ## IconTexture: Interface\AddOns\AzerothUnrolled\Media\icon
@@ -18,7 +18,10 @@ Labels.lua
 Core.lua
 ZoomReadout.lua
 HighlightGuard.lua
+MinimapData.lua
+MinimapLayer.lua
 Follow.lua
+PartyBubbles.lua
 DungeonMaps.lua
 DungeonMapsMM.lua
 SubZoneRegions.lua

@@ -1,8 +1,9 @@
 --[[
-Azeroth Unrolled - MapMenu.lua (1.0.0; 1.2.0: the caves button)
+Azeroth Unrolled - MapMenu.lua (1.0.0; 1.2.0: the caves button; 1.3.0: the imagery button)
 
 The round settings button in the lower right corner of the world map, and its menu; (1.2.0) left of it the caves button,
-which turns the caves on and off.
+which turns the caves on and off; (1.3.0) left of that the imagery button, which switches between the drawn map and
+the minimap imagery (MinimapLayer.lua).
 
   * The buttons are built like Blizzard's own round map button (the map-pin button, WorldMapTrackingPinButtonTemplate,
     Blizzard_WorldMapTemplates.xml:6-63): a 32 px button, the minimap's round background, a 20 px icon, the gold ring
@@ -24,6 +25,10 @@ which turns the caves on and off.
     It shows the setting however that changes - the menu, /unroll cavezoom, a reset: each ends in ZoomReadout:Apply,
     which it follows. Gnomeregan, Maraudon, the Scarlet Monastery and the Timbermaw Hold tunnels show with the city
     maps, not with the caves.
+  * (1.3.0) The imagery button, as Google Maps' layer button: its picture is a live preview of the OTHER look under the
+    view's centre - the minimap there while the drawn map shows, the drawn map while the imagery shows (MinimapLayer.lua
+    sets it, at rest) - and it wears the map-pin button's own toggled glow (UI-Minimap-ZoomButton-Toggle) while the
+    imagery is on. A click switches (Options.lua imagery). WoW Forever only: elsewhere it hides.
   * Every item goes through ns.Options (Options.lua), quietly: the tick (the icon) is the answer. Nothing here is
     protected, nothing touches a Blizzard frame, GameTooltip stays untouched (the hover text is an addon frame, as
     Dungeon.lua's).
@@ -48,12 +53,13 @@ local ART_GLOW = "Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight"
 local ART_ICON = "Interface\\Icons\\INV_Misc_Map_01"
 local ART_CAVES = "Interface\\Icons\\Trade_Mining"
 local ART_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local ART_TOGGLE = "Interface\\Minimap\\UI-Minimap-ZoomButton-Toggle" -- (1.3.0: the map-pin button's ActiveTexture, Blizzard_WorldMapTemplates.xml:49-55)
 
 -- The menu, top to bottom.
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "zoomReadout" }
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout" } -- (1.3.0: + bubbles, imagery)
 local ZOOM = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "openZoom" }
 
-local S = {} -- button, icon, caves, cavesIcon, tip, tipText, dropdown (true: Blizzard's menu)
+local S = {} -- button, icon, caves, cavesIcon, layer, layerIcon, layerGlow, tip, tipText, dropdown (true: Blizzard's menu)
 
 local function Version()
     local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -78,7 +84,7 @@ end
 
 local function AddToggle(root, key)
     local s = ns.Options:Spec(key)
-    if not (s and root.CreateCheckbox) then return end
+    if not (s and root.CreateCheckbox) or (s.avail and not s.avail()) then return end -- (1.3.0: avail - imagery)
     local e = root:CreateCheckbox(s.label, IsOn, Flip, key)
     if e and s.needs and e.SetEnabled then
         e:SetEnabled(function() return ns.Options:Usable(key) end)
@@ -165,6 +171,37 @@ end
 
 local function CavesTip()
     return CavesOn() and "Caves on the map - click to hide them" or "Caves hidden - click to show them"
+end
+
+---------------------------------------------------------------------------
+-- The imagery button (1.3.0)
+---------------------------------------------------------------------------
+local function ImageryOn() return ns.Options:Get("imagery") == true end
+
+local function LayerTip()
+    return ImageryOn() and "Minimap imagery - click for the drawn map" or "Drawn map - click for the minimap imagery"
+end
+
+-- Its picture (MinimapLayer.lua): file and texcoords (a part of a map tile or of a composite), or colour {r, g, b}
+-- (the sea).
+function M:SetLayerPicture(file, rgb, l, r, t, b)
+    local icon = S.layerIcon
+    if not icon then return end
+    if file then
+        icon:SetTexture(file)
+        icon:SetTexCoord(l or 0, r or 1, t or 0, b or 1)
+    elseif rgb then
+        icon:SetColorTexture(rgb[1], rgb[2], rgb[3], 1)
+    end
+end
+
+-- The glow while the imagery is on, and the picture again (the other look changed).
+function M:UpdateLayer()
+    local g = S.layerGlow
+    if not (g and ns.Options and ns.db) then return end
+    local on = ImageryOn()
+    if g:IsShown() ~= on then g:SetShown(on) end
+    if ns.MinimapLayer then ns.MinimapLayer:RefreshPreview(true) end
 end
 
 ---------------------------------------------------------------------------
@@ -305,6 +342,23 @@ local function Build()
     if ns.ZoomReadout then hooksecurefunc(ns.ZoomReadout, "Apply", UpdateCaves) end
     UpdateCaves()
 
+    -- (1.3.0) the imagery button, left of the caves button; its toggled glow over the ring (as the map-pin button's)
+    local l = CreateFrame("Button", nil, map)
+    S.layer = l
+    S.layerIcon = Dress(l, ART_ICON, LayerTip)
+    l:SetPoint("BOTTOMRIGHT", c, "BOTTOMLEFT", CAVES_X, 0)
+    local g = l:CreateTexture(nil, "OVERLAY", nil, 2)
+    g:SetTexture(ART_TOGGLE)
+    if g.SetBlendMode then g:SetBlendMode("ADD") end
+    g:SetSize(37, 37)
+    g:SetPoint("TOPLEFT", l, "TOPLEFT", -2, 1)
+    g:Hide()
+    S.layerGlow = g
+    l:SetScript("OnClick", function()
+        ns.Options:Toggle("imagery", true)
+        ShowTip(l, LayerTip())
+    end)
+
     -- The quest-log arrow comes and goes with the map's display state (QuestLogOwnerMixin:SetDisplayState).
     if map.SetDisplayState then hooksecurefunc(map, "SetDisplayState", Place) end
     map:HookScript("OnShow", Place)
@@ -314,21 +368,25 @@ end
 -- The setting -> the buttons (Options.lua calls this after /unroll button and after a reset).
 function M:Apply()
     Build()
-    local b, c = S.button, S.caves
+    local b, c, l = S.button, S.caves, S.layer
     if not b then return end
     if ns.db.mapButton ~= false then
         Place()
         b:Show()
         c:Show()
+        l:SetShown(ns.MinimapLayer ~= nil and ns.MinimapLayer:Supported()) -- (1.3.0: WoW Forever only)
     else
         -- (an open menu closes by itself: Blizzard's menu follows its owner, Menu.lua:2504-2510)
         b:Hide()
         c:Hide()
+        l:Hide()
     end
+    M:UpdateLayer()
 end
 
 function M:Button() return S.button end
 function M:CavesButton() return S.caves end
+function M:LayerButton() return S.layer, S.layerIcon, S.layerGlow end -- (1.3.0)
 function M:UsesBlizzardMenu() return S.dropdown == true end
 
 local ev = CreateFrame("Frame")

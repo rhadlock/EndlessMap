@@ -12,8 +12,8 @@ instead, with HitTest below; the name itself is not a click target.)
 A detail level drawn into the world map (Render.lua: Blackrock Mountain's
 entrance level, ns.DETAIL_MAPS) brings the icons of the dungeons it leads to;
 they fade with the level's picture and stand in for the entrance's own icon,
-which fades out meanwhile. (2.10.0: Dalaran's brings its name instead.)
-3.0.0 (Doors.lua): placeholders for the instances not in the game files yet
+which fades out meanwhile. (1.0.0: Dalaran's brings its name instead.)
+1.0.0 (Doors.lua): placeholders for the instances not in the game files yet
 (hollow grey diamonds, drawn after every other label, never a click target,
 hidden by /unroll doors hints), doors learned in game (moved / restyled here),
 and the "you are inside" marker - the round player icon on the door icon of
@@ -28,15 +28,15 @@ local layer
 local items = {}
 local taxiLoaded = {}
 local placed = {}
-local placedGhost = {} -- (3.0.0 review) placed[i..i+3] is a placeholder's name + icon rect (placedGhost[i])
--- (3.1.0) placed[i..i+3] belongs to a label the city switch is fading right now (it.soft: a capital's name giving way
+local placedGhost = {} -- (1.0.0 review) placed[i..i+3] is a placeholder's name + icon rect (placedGhost[i])
+-- (1.0.0) placed[i..i+3] belongs to a label the city switch is fading right now (it.soft: a capital's name giving way
 -- to its banner or coming back with the city's map, a detail level's name and icons, the entrance icon that gives way
 -- to them): placedSoft[i] = its alpha. While it is part-faded by the switch it does not push another label off the map -
 -- that one shows through it, as much as the first is gone (softA) - so two labels that trade places crossfade; before,
 -- the second one popped in (or out) at full alpha when the first one's fade ended (or began). A label fading for any
 -- other reason (its zoom band) blocks as it always did.
 local placedSoft = {}
--- (3.1.0 review) placedLevel[i]: the detail level (it.detail) of a part-faded label at placed[i..i+3], else false. Labels
+-- (1.0.0 review) placedLevel[i]: the detail level (it.detail) of a part-faded label at placed[i..i+3], else false. Labels
 -- of ONE level fade together (the same alpha): between them the overlap stays hard, as at full alpha - else, while the
 -- level fades in or out, a name it hides showed through it (two names drawn on top of each other for the whole fade).
 local placedLevel = {}
@@ -47,7 +47,7 @@ local hot            -- the entrance icon under the cursor (Dungeon.lua)
 local ICON_HIT = 10  -- entrance icons take clicks in a 20 x 20 px square around the diamond
 local HOT_GROW = 1.25
 local DIAMOND = "Interface\\Buttons\\WHITE8X8"
-local HERE_FILE = "Interface\\WorldMap\\WorldMapPlayerIcon" -- (3.0.0) the round player icon (Dungeon.lua DOT_FILE)
+local HERE_FILE = "Interface\\WorldMap\\WorldMapPlayerIcon" -- (1.0.0) the round player icon (Dungeon.lua DOT_FILE)
 local HERE_SIZE = 22
 -- (the "you are inside" door beyond its own zoom band: its icon alone, placed after every name - so it pushes none off the
 -- map, it draws over one as the player arrow does - and before the placeholders; in its band it is placed as always)
@@ -60,8 +60,9 @@ local STYLE = {
     raid      = { size = 11, r = 1.00, g = 0.50, b = 0.20, prio = 50, dot = 12, icon = true },
     dungeon   = { size = 10, r = 0.40, g = 1.00, b = 0.40, prio = 40, dot = 10, icon = true },
     flight    = { size = 9,  r = 1.00, g = 1.00, b = 0.60, prio = 20, dot = 5 },
-    cave      = { size = 10, r = 0.92, g = 0.84, b = 0.64, prio = 25 }, -- (3.4.0) a cave's name (Caves.lua), with its picture
-    -- (3.0.0) placeholders (Doors.lua): hollow grey diamonds with grey names, placed after every other label (so they
+    cave      = { size = 10, r = 0.92, g = 0.84, b = 0.64, prio = 25 }, -- (1.2.0) a cave's name (Caves.lua), with its picture
+    subzone   = { size = 10, r = 0.93, g = 0.89, b = 0.78, prio = 22 }, -- (1.3.0) a sub-zone's name over the minimap imagery
+    -- (1.0.0) placeholders (Doors.lua): hollow grey diamonds with grey names, placed after every other label (so they
     -- never push one off the map); their kind stays "dungeon" / "raid" (the same zoom bands)
     ghostDungeon = { size = 10, r = 0.66, g = 0.66, b = 0.66, prio = 15, dot = 10, icon = true, hollow = true },
     ghostRaid    = { size = 11, r = 0.66, g = 0.66, b = 0.66, prio = 15, dot = 12, icon = true, hollow = true },
@@ -77,7 +78,16 @@ end
 
 -- Visibility bands, in zoom of the owning map (1 = that map fills the view).
 -- Zone/city names give way as their own art fades in (Render.FADE_Z0/Z1).
-local function AlphaFor(kind, z, owner, v)
+-- (1.3.0) mm: the minimap imagery shows (MinimapLayer.lua) - it prints no names: zone and city names stay on until the
+-- view is well inside them, sub-zone names (of explored pieces, see Labels:Draw) come in as a zone's own would give way.
+local function AlphaFor(kind, z, owner, v, mm)
+    if mm then
+        if kind == "zone" then return ns.Band(z, 0.10, 0.18, 1.6, 2.4)
+        elseif kind == "city" then return ns.Band(z, 0.035, 0.07, 1.6, 2.4)
+        elseif kind == "subzone" then return ns.Band(z, 0.5, 0.75) end
+    elseif kind == "subzone" then
+        return 0
+    end
     if kind == "continent" then
         -- Continent names belong to the Azeroth view: judge them by how far
         -- the world map is zoomed, not by the continent's own zoom.
@@ -99,11 +109,11 @@ local function Add(x, y, text, kind, owner)
     if not (x and y and text and text ~= "" and owner) then return end
     local it = { x = x, y = y, text = text, kind = kind, owner = owner, style = STYLE[kind] }
     items[#items + 1] = it
-    it.seq = #items -- (3.1.0: ByPriority's last word)
+    it.seq = #items -- (1.0.0: ByPriority's last word)
     return it
 end
 
--- One ns.INSTANCES row -> its entrance item. (3.0.0) Rows from Doors.lua may also carry door = its record (Doors.lua),
+-- One ns.INSTANCES row -> its entrance item. (1.0.0) Rows from Doors.lua may also carry door = its record (Doors.lua),
 -- style = a STYLE key other than the kind's (placeholders), noClick = nothing opens on a click (no map behind it).
 local function AddRow(d)
     local x, y, owner = ns.WorldPosToMap(d[1], d[2], d[3])
@@ -138,7 +148,7 @@ function Labels:Build()
             Add(e.cx, e.cy, e.name, "continent", e)
         elseif capital[e.id] then
             local it = Add(e.cx, e.cy, e.name, "city", e)
-            if it then it.capital = e.id end -- (3.1.0: gives way to the zone's printed banner, see Labels:Draw)
+            if it then it.capital = e.id end -- (1.0.0: gives way to the zone's printed banner, see Labels:Draw)
         else
             Add(e.cx, e.cy, e.name, "zone", e)
         end
@@ -148,7 +158,42 @@ function Labels:Build()
     Labels:BuildDetailIcons()
 end
 
--- (3.0.0, Doors.lua) a door learned mid-session: its row's item; every item (read only); an item moved to another world
+-- (1.3.0, MinimapLayer.lua) The sub-zone names (MinimapData.lua MINIMAP_SUBZONES: at their explored-area pieces), added
+-- once, when the minimap imagery first shows - they draw only over it, each while one of its pieces is explored.
+local subzonesAdded = false
+function Labels:AddSubzones()
+    if subzonesAdded or not ns.MINIMAP_SUBZONES then return end
+    subzonesAdded = true
+    for id, rows in pairs(ns.MINIMAP_SUBZONES) do
+        local e = ns.maps[id]
+        if e and e.mapType == ns.MAPTYPE_ZONE then
+            for _, r in ipairs(rows) do
+                local name = r[2]
+                if C_Map and C_Map.GetAreaInfo then
+                    local ok, loc = pcall(C_Map.GetAreaInfo, r[1])
+                    if ok and type(loc) == "string" and not (issecretvalue and issecretvalue(loc)) and loc ~= "" then name = loc end
+                end
+                local it = Add(e.x0 + r[3] * (e.x1 - e.x0), e.y0 + r[4] * (e.y1 - e.y0), name, "subzone", e)
+                if it then
+                    it.pieces = {}
+                    for k = 5, #r do it.pieces[#it.pieces + 1] = r[k] end
+                end
+            end
+        end
+    end
+end
+
+-- Is one of a sub-zone label's explored-area pieces explored?
+local function SubzoneExplored(it)
+    local MM, P = ns.MinimapLayer, it.pieces
+    if not (MM and P) then return false end
+    for k = 1, #P - 3, 4 do
+        if MM:PieceExplored(it.owner.id, P[k], P[k + 1], P[k + 2], P[k + 3]) then return true end
+    end
+    return false
+end
+
+-- (1.0.0, Doors.lua) a door learned mid-session: its row's item; every item (read only); an item moved to another world
 -- point (zone: the uiMap it belongs to, else the one the game names); an item's look changed (STYLE key) - its widgets are
 -- made again on the next draw.
 function Labels:AddRow(d) return AddRow(d) end
@@ -201,7 +246,7 @@ local function DetailFade(it, a)
     return a * (1 - R:DetailAlpha(it.hideFor))
 end
 
--- (3.0.0) The door of the instance the player is in (it.here, Doors.lua) shows at every zoom - but a detail level's own
+-- (1.0.0) The door of the instance the player is in (it.here, Doors.lua) shows at every zoom - but a detail level's own
 -- icon only with its picture, and the entrance icon that gives way to it only while the picture does not show.
 local function HereAlpha(it, a)
     if it.detail then return a end
@@ -285,7 +330,7 @@ local function EnsureWidgets(it)
         if it.dot.SetRotation then it.dot:SetRotation(math.rad(45)) end
         it.dot:Hide()
         if s.hollow then
-            -- (3.0.0 placeholder: the diamond's dark middle - a grey outline is left)
+            -- (1.0.0 placeholder: the diamond's dark middle - a grey outline is left)
             it.hole = layer:CreateTexture(nil, "OVERLAY", nil, 3)
             it.hole:SetTexture(DIAMOND)
             it.hole:SetSize(s.dot - 4, s.dot - 4)
@@ -298,7 +343,7 @@ local function EnsureWidgets(it)
     it.shown = false
 end
 
--- (3.0.0) the "you are inside" marker: the round player icon over the door icon (Doors.lua pulses its alpha)
+-- (1.0.0) the "you are inside" marker: the round player icon over the door icon (Doors.lua pulses its alpha)
 local function HereTex(it)
     if not it.hereTex then
         it.hereTex = layer:CreateTexture(nil, "OVERLAY", nil, 5)
@@ -373,7 +418,7 @@ local function Overlaps(x0, y0, x1, y1, count, noGhost, level)
     return false
 end
 
--- (3.1.0) Two labels of the same priority and alpha keep one order (the order they were made in): before, the sort left
+-- (1.0.0) Two labels of the same priority and alpha keep one order (the order they were made in): before, the sort left
 -- it open, and which of two overlapping names showed could change whenever another label entered or left the view.
 local function ByPriority(a, b)
     if a.prio ~= b.prio then return a.prio > b.prio end
@@ -396,6 +441,7 @@ function Labels:Draw(cam, v)
     end
 
     local n = 0
+    local mm = ns.MinimapLayer ~= nil and ns.MinimapLayer:Active() -- (1.3.0: the minimap imagery shows)
     for _, it in ipairs(items) do
         local sx = W / 2 + (it.x - cam.x) * ppx
         local sy = H / 2 + (it.y - cam.y) * ppy
@@ -403,20 +449,21 @@ function Labels:Draw(cam, v)
         if sx > -60 and sx < W + 60 and sy > -20 and sy < H + 20
             and (it.kind ~= "flight" or ns.db.flightPaths)
             and ns.db[it.style.icon and "dungeonIcons" or "placeNames"] ~= false -- (Azeroth Unrolled 1.0.0: the two halves of the layer)
-            and not it.off and not (it.ghost and ns.db.doorHints == false) then -- (3.0.0: retired / placeholders off)
-            a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v)
+            and not it.off and not (it.ghost and ns.db.doorHints == false) then -- (1.0.0: retired / placeholders off)
+            a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm)
+            if it.pieces and a > 0 and not SubzoneExplored(it) then a = 0 end -- (1.3.0: a sub-zone's name)
             it.soft = nil
             if it.detail or it.hideFor then
                 a = DetailFade(it, a)
-                -- (3.1.0: part-faded by the switch right now? see placedSoft)
+                -- (1.0.0: part-faded by the switch right now? see placedSoft)
                 local d = ns.Render.DetailAlpha and ns.Render:DetailAlpha(it.detail or it.hideFor) or 0
                 if d > 0.03 and d < 0.97 then it.soft = true end
             end
-            -- (3.1.0) a capital's name gives way while its zone's drawing prints it (the banner, below the city switch)
+            -- (1.0.0) a capital's name gives way while its zone's drawing prints it (the banner, below the city switch)
             if it.capital and a > 0 and ns.Render.CityNameFade then
                 local k, timed = ns.Render:CityNameFade(it.capital, v, cam.vw)
                 a = a * k
-                -- (3.1.0 review: soft only while the switch's timed fade moves it - part-faded by the zoom band at rest it
+                -- (1.0.0 review: soft only while the switch's timed fade moves it - part-faded by the zoom band at rest it
                 -- lay half-drawn over another name, e.g. Undercity over the Ruins of Lordaeron door)
                 if k < 0.97 and timed then it.soft = true end
             end
@@ -425,7 +472,7 @@ function Labels:Draw(cam, v)
         end
         if a > 0.03 then
             n = n + 1
-            it.hereOnly = (it.here and own <= 0.03) or nil -- (3.0.0: the "you are inside" door beyond its band - its icon)
+            it.hereOnly = (it.here and own <= 0.03) or nil -- (1.0.0: the "you are inside" door beyond its band - its icon)
             it.alpha, it.sx, it.sy, it.prio = a, sx, sy, it.hereOnly and HERE_PRIO or it.style.prio
             sortBuf[n] = it
         else
@@ -436,7 +483,7 @@ function Labels:Draw(cam, v)
     table.sort(sortBuf, ByPriority)
 
     local count = 0
-    -- (3.1.0) The instance icons of a detail level (it.portal) keep their ICON whenever the level shows - each is a click
+    -- (1.0.0) The instance icons of a detail level (it.portal) keep their ICON whenever the level shows - each is a click
     -- target, and at the world zoom the level now appears from, two of Blackrock Mountain's are 16 px apart: their icon
     -- rects are taken first, names are placed after them (a name never covers such an icon).
     for i = 1, n do
@@ -468,7 +515,7 @@ function Labels:Draw(cam, v)
         if it.dot and not it.iconKept then y1 = cy + half end -- (iconKept: the name's own rect - its icon has one already)
         local text = not it.iconOnly and not it.hereOnly
         if not text then x0, y0, x1, y1 = cx - half, cy - half, cx + half, cy + half end
-        -- (3.0.0 review) a placeholder whose name the map's edge would cut (The Drowned City, at Stranglethorn's west edge)
+        -- (1.0.0 review) a placeholder whose name the map's edge would cut (The Drowned City, at Stranglethorn's west edge)
         -- has the name moved inside the map while its icon is on it (the icon stays at its point); an icon leaving the map
         -- takes the name along beside it, so the name never jumps while the map moves
         local tx, soft = cx, 0 -- (soft: how much a part-faded label of the city switch covers this one, see placedSoft)
@@ -485,7 +532,7 @@ function Labels:Draw(cam, v)
         elseif text then
             soft = softA
         end
-        -- (3.0.0) the "you are inside" door keeps its icon wherever another label lies; a placeholder's icon gives way to
+        -- (1.0.0) the "you are inside" door keeps its icon wherever another label lies; a placeholder's icon gives way to
         -- no other placeholder (Barrow Deeps beside Hyjal Summit's name: both icons show)
         if it.iconKept then
             if text then
@@ -503,9 +550,9 @@ function Labels:Draw(cam, v)
             or (not it.here and Overlaps(x0, y0, x1, y1, count, it.ghost, it.detail))) then
             HideItem(it)
         elseif it.alpha * (1 - ((text or it.here) and soft or softA)) <= 0.03 then
-            HideItem(it) -- (3.1.0: all of it under a part-faded label of the city switch)
+            HideItem(it) -- (1.0.0: all of it under a part-faded label of the city switch)
         else
-            -- (3.1.0: as much of it as a part-faded label of the city switch lets through; not text: its icon's own
+            -- (1.0.0: as much of it as a part-faded label of the city switch lets through; not text: its icon's own
             -- rect was tested just above)
             it.alpha = it.alpha * (1 - ((text or it.here) and soft or softA))
             placed[count + 1], placed[count + 2], placed[count + 3], placed[count + 4] = x0, y0, x1, y1
@@ -572,7 +619,7 @@ function Labels:SetHot(it)
     if it then Paint(it, true) end
 end
 
--- (3.0.0, Doors.lua) a door learned in game: its item moves to world point (c: 0 / 1, x north, y west; zone: the uiMap it
+-- (1.0.0, Doors.lua) a door learned in game: its item moves to world point (c: 0 / 1, x north, y west; zone: the uiMap it
 -- belongs to, else the one the game names) - false if the game cannot place it.
 function Labels:MoveItem(it, c, x, y, zone)
     local mx, my, owner = ns.WorldPosToMap(c, x, y)
@@ -583,7 +630,7 @@ function Labels:MoveItem(it, c, x, y, zone)
     return true
 end
 
--- (3.0.0, Doors.lua) an item's look (a STYLE key: a placeholder that became a learned door): the old widgets are hidden
+-- (1.0.0, Doors.lua) an item's look (a STYLE key: a placeholder that became a learned door): the old widgets are hidden
 -- and made again, in the new look, when the item is next drawn.
 function Labels:SetStyle(it, key)
     local st = STYLE[key]

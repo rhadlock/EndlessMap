@@ -15,7 +15,7 @@ game can draw the player and the group, the game draws them.
     the ENGINE draws the player arrow (turned by itself) and the class-coloured
     party / raid dots, exactly where it draws them on the world map. Sizes as
     GroupMembersDataProviderMixin:GetUnitPinSizesTable (27 / 11 / 8.25 px).
-  * (wf12) Pages of an instance that is a copy of Eastern Kingdoms at unchanged
+  * (1.0.0) Pages of an instance that is a copy of Eastern Kingdoms at unchanged
     world coordinates (DungeonMapsMM.lua cp: City of Dalaran, Half-Pint
     Tavern): the same widget on the parent's zone map. Addons get no position
     in instances; the engine does - whether it draws there is its own doing.
@@ -160,10 +160,10 @@ local function ZoneRect(id)
     return c0, X0, Y0, X1, Y1
 end
 
--- (wf12) The continent whose zone maps hold a page (nil: none): an open-world
+-- (1.0.0) The continent whose zone maps hold a page (nil: none): an open-world
 -- page's own map (0 / 1), or the cosmetic parent of an instance that is a copy
 -- of that continent at UNCHANGED world coordinates (DungeonMapsMM.lua cp: City
--- of Dalaran, Half-Pint Tavern - wf12/engine: every ADT tile matches map 0's
+-- of Dalaran, Half-Pint Tavern - the engine research: every ADT tile matches map 0's
 -- tile of the same index in heights and placed objects). Inside those
 -- instances the game gives addons no position (UnitPosition: nil, nil, nil,
 -- id), but the engine widget places units itself - IF the engine puts the
@@ -204,7 +204,7 @@ end
 -- open world at the same coordinates - is left out: the page is the instance.
 local function OnCpMap(page, u)
     if u == "player" then
-        -- (2.9.0 / verify_engine V1-V2: City of Dalaran's Underbelly page spans the same world rectangle as the city
+        -- (1.0.0 / verify_engine V1-V2: City of Dalaran's Underbelly page spans the same world rectangle as the city
         -- page - the player goes on the widget only where the sub-zone allows this floor, PollArrow's rule)
         if PlayerInstance() ~= page.inst then return false end
         return not (ns.Dungeon and ns.Dungeon.PlayerOnFloor) or ns.Dungeon:PlayerOnFloor(page)
@@ -275,7 +275,7 @@ local function ZoneFor(page)
     if x then
         here = inst == page.inst and InRegion(page.f.r, x, y, 0.05)
     elseif li ~= page.inst then
-        -- (wf12: in a cosmetic-parent instance the game gives no position - the
+        -- (1.0.0: in a cosmetic-parent instance the game gives no position - the
         -- player is somewhere in it; the zone the game itself puts the player on
         -- is still the one to use, when it is a zone of the parent continent)
         here = PlayerInstance() == page.inst
@@ -283,7 +283,7 @@ local function ZoneFor(page)
     if here and C_Map and C_Map.GetBestMapForUnit then
         local ok, id = pcall(C_Map.GetBestMapForUnit, "player")
         if ok then
-            -- (2.9.0: on a cosmetic-parent page also the parent continent itself - verify_engine: Forever's zone rows
+            -- (1.0.0: on a cosmetic-parent page also the parent continent itself - verify_engine: Forever's zone rows
             -- filter by area, and these instances' areas are their own, so the game may place the player on the
             -- continent map only)
             local z = ZoneLayout(id, li, li ~= page.inst)
@@ -374,8 +374,8 @@ local function SetPageImpl(self, page)
     E.page, E.zone, E.mode = page, nil, nil
     E.npos, E.rosterT, E.placed, E.frameRect = 0, 0, false, nil
     if not E.dv then return end
-    -- (wf12: on a cosmetic-parent instance's page only while the game gives
-    -- addons no position there - where it does, our own arrow / dots as 2.8.0)
+    -- (1.0.0: on a cosmetic-parent instance's page only while the game gives
+    -- addons no position there - where it does, our own arrow / dots as before)
     if page and LayoutMap(page) and Want() and not (CpPage(page) and Position("player")) then
         local z = ZoneFor(page)
         if z then

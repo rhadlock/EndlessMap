@@ -12,13 +12,13 @@ menu (MapMenu.lua) and the game's Settings page (OptionsPanel.lua) - so a settin
     ns.Options:Default(key)
     ns.Options:Spec(key), :List()       label, kind ("bool" / "num"), presets - what the menus are built from
 
-Core.lua keeps the saved table, its defaults (ns.DEFAULTS - this file adds its own three rows), the chat printer
+Core.lua keeps the saved table, its defaults (ns.DEFAULTS - this file adds its own rows), the chat printer
 (ns.Print), the redraw (ns.Refresh), the command handler (ns.RunCommand) and its first slash word (ns.COMMAND).
 Three commands keep their own handlers and messages: zoom and cityzoom (ZoomReadout.lua), doors hints (Doors.lua);
 the menus set those values here and call the same Apply / redraw those handlers call.
 
 Place names and dungeon icons: "labels" stays the switch of the whole label layer (/unroll labels: names AND icons, as
-in SmoothMapZoom 3.0). placeNames and dungeonIcons are its two halves; choosing one of them turns the layer on and
+before 1.0.0). placeNames and dungeonIcons are its two halves; choosing one of them turns the layer on and
 leaves the other half as it was on screen.
 ]]
 local _, ns = ...
@@ -56,6 +56,7 @@ Add({ key = "enabled", kind = "bool", label = "Smooth zoom", said = "smooth zoom
         Redraw()
         -- (back on inside a dungeon: its map again, as /unroll dungeons does)
         if on and not was and ns.Dungeon then ns.Dungeon:AutoOpen() end
+        if ns.Bubbles then ns.Bubbles:Apply() end -- (1.3.0: the party bubbles go with it - no following without it)
     end })
 Add({ key = "placeNames", kind = "bool", cmd = "names", label = "Place names", said = "place names ",
     tip = "The names of continents, zones, cities and flight masters on the map.",
@@ -104,7 +105,7 @@ Add({ key = "flySpeed", kind = "num", cmd = "speed", lo = 0.25, hi = 4, label = 
     tip = "The speed of the flight to another map (a click on a zone, the quest log).",
     said = function(v) return ("flight speed: %gx"):format(v) end,
     presets = { { 0.5, "Slow" }, { 1, "Normal" }, { 2, "Fast" }, { 4, "Fastest" } } })
--- (the WORLD zoom from which the city maps show; false: 1.5x of each city's own zone, the rule of SmoothMapZoom 3.0)
+-- (the WORLD zoom from which the city maps show; false: 1.5x of each city's own zone, the rule before 1.0.0)
 Add({ key = "cityZoom", kind = "num", lo = 1, hi = ns.Render.CITY_G_MAX, orFalse = true, label = "City maps appear", unit = "x",
     tip = "The zoom (1x = the whole world map) from which the city maps replace their zone's drawing of the city.",
     said = function(v)
@@ -116,7 +117,7 @@ Add({ key = "cityZoom", kind = "num", lo = 1, hi = ns.Render.CITY_G_MAX, orFalse
         if ns.Core then Redraw() end
     end })
 
--- (3.3.0, Follow.lua) following a character, and where M opens the map
+-- (1.1.0, Follow.lua) following a character, and where M opens the map
 Add({ key = "follow", kind = "bool", cmd = "follow", label = "Follow on click", said = "follow on click ",
     tip = "Click your arrow or a party member on the map: the map follows them. Click them again, drag the map or click a zone to stop.",
     apply = function(on) if not on and ns.Follow then ns.Follow:Stop() end end })
@@ -127,7 +128,7 @@ Add({ key = "openZoom", kind = "num", cmd = "openzoom", lo = 1, hi = 25, orFalse
     end,
     presets = { { 10, "Wide" }, { 14, "Normal" }, { 20, "Close" }, { false, "Off (the game's view)" } } })
 
--- (3.4.0) M also follows you; the caves' switch (no command of its own: ZoomReadout.lua handles /unroll cavezoom, as
+-- (1.2.0) M also follows you; the caves' switch (no command of its own: ZoomReadout.lua handles /unroll cavezoom, as
 -- cityzoom)
 Add({ key = "openFollow", kind = "bool", cmd = "openfollow", label = "M follows me", said = "M opens the map following you: ",
     tip = "When M opens the map on your character, the map also follows you, as a click on your arrow does." })
@@ -141,6 +142,22 @@ Add({ key = "caveZoom", kind = "num", lo = ns.Render.CAVE_G_MIN, hi = ns.Render.
     apply = function()
         if ns.ZoomReadout then ns.ZoomReadout:Apply() end
         if ns.Core then Redraw() end
+    end })
+
+-- (1.3.0, PartyBubbles.lua) you and your party in round bubbles under the map's top left button
+Add({ key = "bubbles", kind = "bool", cmd = "bubbles", label = "Party bubbles", said = "party bubbles on the map ",
+    tip = "You and your party (in a raid: your group) as round portraits under the map's top left button. Hover one for the zone they are in; click it to go to them and follow them.",
+    apply = function() if ns.Bubbles then ns.Bubbles:Apply() end end })
+
+-- (1.3.0, MinimapLayer.lua) the map drawn from the game's own minimap pictures; WoW Forever only (avail: the menus leave it
+-- out elsewhere, MapMenu.lua / OptionsPanel.lua)
+local function Imagery() return ns.MinimapLayer ~= nil and ns.MinimapLayer:Supported() end
+Add({ key = "imagery", kind = "bool", cmd = "imagery", label = "Minimap imagery", avail = Imagery,
+    tip = "The map drawn from the game's own minimap pictures - the real terrain - instead of the drawn map; land you have not explored is greyed. The round button left of the caves button switches between the two.",
+    said = function(on) return "minimap imagery " .. OnOff(on) .. (Imagery() and "" or " (WoW Forever only)") end,
+    apply = function()
+        Redraw()
+        if ns.MapMenu and ns.MapMenu.UpdateLayer then ns.MapMenu:UpdateLayer() end
     end })
 
 -- Slash only (not in the menus).
@@ -158,8 +175,13 @@ Add({ key = "cells", kind = "bool", cmd = "cells", said = "seamless zone cells "
 Add({ key = "engineMarkers", kind = "bool", cmd = "markers",
     said = function(on) return "group on entrance maps drawn by " .. (on and "the game (its group widget)" or "the addon (dots)") end,
     apply = function() if ns.Dungeon and ns.Dungeon.RefreshMarkers then ns.Dungeon:RefreshMarkers() end end })
+-- (1.3.0, MinimapLayer.lua) the game's own minimap tiles at the imagery's deepest zooms - drawn by fileDataID as Dalaran's
+-- detail map and the caves have been since 1.0; a way out should they ever misbehave (not in the help or the menus)
+Add({ key = "imageryTiles", kind = "bool", cmd = "imagerytiles",
+    said = function(on) return "the game's own minimap tiles in the minimap imagery " .. OnOff(on) .. (Imagery() and "" or " (WoW Forever only)") end,
+    apply = Redraw })
 Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the map",
-    tip = "The round settings and caves buttons in the map's lower right corner.",
+    tip = "The round settings, caves and imagery buttons in the map's lower right corner.", -- (1.3.0: + imagery)
     said = function(on)
         return "buttons on the map " .. OnOff(on) .. (on and "" or (" (" .. Cmd() .. " button shows them again)"))
     end,
@@ -167,7 +189,7 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 
 -- The defaults of the settings this file adds (Core.lua fills the saved table from ns.DEFAULTS on ADDON_LOADED and on
 -- /unroll reset; its own rows are in Core.lua).
-local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true }
+local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true } -- (1.3.0: + bubbles, imagery, imageryTiles)
 if ns.DEFAULTS then
     for k, v in pairs(OWN_DEFAULTS) do
         if ns.DEFAULTS[k] == nil then ns.DEFAULTS[k] = v end
@@ -224,10 +246,11 @@ function O:Reset(quiet)
     local db, defaults = ns.db, ns.DEFAULTS
     if not (db and defaults) then return false end
     for k, val in pairs(defaults) do db[k] = val end
-    if ns.Dungeon and ns.Dungeon.ToggleBosses then ns.Dungeon:ToggleBosses(db.bosses) end -- (review2: markers follow)
+    if ns.Dungeon and ns.Dungeon.ToggleBosses then ns.Dungeon:ToggleBosses(db.bosses) end -- (review: markers follow)
     if ns.ZoomReadout then ns.ZoomReadout:Apply() end
     Redraw()
     if ns.MapMenu then ns.MapMenu:Apply() end
+    if ns.Bubbles then ns.Bubbles:Apply() end -- (1.3.0)
     if not quiet then Say("settings reset") end
     return true
 end
@@ -249,5 +272,7 @@ end
 function O:Help()
     local c = Cmd()
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
-    Say(c .. " button          show or hide the buttons on the map (settings, caves)")
+    Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
+    Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
+    Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
 end

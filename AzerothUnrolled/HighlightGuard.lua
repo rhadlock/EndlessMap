@@ -1,7 +1,7 @@
 local _, ns = ...
 
 --[[
-HighlightGuard (3.1.1): Blizzard's zone hover highlight on a CONTINENT map
+HighlightGuard (1.0.0): Blizzard's zone hover highlight on a CONTINENT map
 (MapHighlightPinMixin:Refresh, Blizzard_SharedMapDataProviders/MapHighlightDataProvider.lua) is drawn from a small, soft
 texture made for the continent's own view. Where no zone map can show the view (Orgrimmar's north half lies outside
 Durotar's map, a view across a zone border), the map under ours stays the continent, and when we zoom far past that

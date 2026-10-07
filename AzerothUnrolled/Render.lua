@@ -23,7 +23,7 @@ using the real art), bottom to top:
      city's cell is cut out of its parent's), so the continent is covered by
      sharp zone art without gaps or overlaps. Only far sea and the odd strip
      of land no zone picture reaches keep the continent art.
-     (3.1.0) A capital's cell shows its HOME ZONE's picture (BuildCityFill):
+     (1.0.0) A capital's cell shows its HOME ZONE's picture (BuildCityFill):
      below the city switch the mosaic is the zone as Blizzard draws it, title
      banner included, wherever the camera is. Above the switch the banner is
      painted over with the zone's own art (ZoneMaskPatches, faded in with the
@@ -39,7 +39,7 @@ using the real art), bottom to top:
      feathered), and on the level right above it its explored pieces (the
      picture's "top"). Zones still fading out keep their own two picture
      levels, newest on top.
-     (3.2.0) The BASE only for a capital, and for a zone the mosaic cannot
+     (1.0.1) The BASE only for a capital, and for a zone the mosaic cannot
      draw (no fitting cell: Classic Era, cells or mosaic off -
      WholePicture). A zone's map is a rectangle reaching over its
      neighbours (the median zone picture is 29 % other zones' land, drawn
@@ -50,7 +50,7 @@ using the real art), bottom to top:
      draws the real map's explored areas over everything at rest - but its
      base is never drawn and never hides what lies under it (FindCovers).
      Every zone's cell now also takes the open sea next to its own coast
-     (the 3.2.0 masks), so coasts stay sharp without the base.
+     (the 1.0.1 masks), so coasts stay sharp without the base.
 Frame alpha multiplies each texture on its own (no group fade: the engine's
 frame buffers crash this client), so a picture fading at alpha b would let
 its unexplored base tint its explored pieces. The top therefore fades in
@@ -60,22 +60,22 @@ Zone art (2, 3) fades in while the continent goes from 2.5x to 4x zoom -
 exactly when its art turns blurry - so the map stays sharp all the way down.
 When the view sits inside a zone (as Blizzard shows it), the picture's
 frame ring fades back in, so at rest it looks exactly like Blizzard's map
-(3.2.0: only where a base still shows - capitals and the fallback).
+(1.0.1: only where a base still shows - capitals and the fallback).
 At rest Blizzard draws the real map's explored areas over our whole band;
 pictures we stack above that map's pieces (a city whose view pokes out of
 the city, so its zone is the real map) move just above them (SetRestLift).
 
 City detail (LOD): a capital's own map has 2x (Stormwind) to 6x (Ironforge)
-the texels per world unit of its home zone's map. (3.1.0) ONE global switch:
+the texels per world unit of its home zone's map. (1.0.0) ONE global switch:
 from WORLD zoom 14.05x (ns.WorldZoom: 1.00x = the whole world map fills the
 view; Render.CITY_G, /unroll cityzoom) every city's own map replaces the zone's
 drawing of it, whatever has the focus and wherever the camera is; below it
 (hidden again just under the line, Render.CITY_G_HIDE) the map is Blizzard's
-zone drawing with the printed city banner. (/unroll cityzoom off: the rule up to
-3.0.1 - from 1.5x of each city's own home zone, off below 1.35x.)
+zone drawing with the printed city banner. (/unroll cityzoom off: the rule before
+1.0.0 - from 1.5x of each city's own home zone, off below 1.35x.)
 The city's PATCH - its map cut to its zone cell (no rectangle) - lies above
 EVERY zone picture (a neighbour's picture never covers a city), right under
-the city's own picture. (3.6.2) Where its map holds land no zone cell covers -
+the city's own picture. (1.2.0) Where its map holds land no zone cell covers -
 Orgrimmar's walls between Azshara's and Durotar's pictures, Stormwind's harbour
 west of Elwynn's - the patch takes that too (ZoneMasks patch masks: frame and
 emblems left out), so above the switch the city's map shows there, not the
@@ -108,7 +108,7 @@ Searing Gorge) - and in the rest lift band at rest, over Blizzard's canvas'
 explored areas of either zone. Labels.lua puts the icons of its instances on
 it (Render:DetailAlpha), Dungeon.lua takes clicks on its bare art
 (Render:DetailAt).
-Dalaran (2.10.0), WoW Forever's open-world city in Alterac Mountains, is the
+Dalaran (1.0.0), WoW Forever's open-world city in Alterac Mountains, is the
 second detail level: its art is the client's own Eastern Kingdoms minimap (a
 3 x 3 grid of 512 px tiles, 2.68x Alterac's texel density) cut to the barrier
 ring and the gate plaza; Alterac's printed DALARAN banner is covered in the
@@ -121,7 +121,7 @@ confinement: that only comes with the deeper zoom a city's own uiMap allows
 (maxZoom 4x: 1.49 screen px per minimap texel) - unlike Ironforge's 6.23x
 (0.64 px per texel at Dun Morogh's limit), there is no deeper detail to zoom
 into and keep the view on.
-Caves (3.4.0, Caves.lua): more detail levels of this kind - Blizzard's cave maps
+Caves (1.2.0, Caves.lua): more detail levels of this kind - Blizzard's cave maps
 of the old world where WoW Forever's cave is the one drawn, each cut to its
 footprint in the client's own indoor minimap - switched by their own world zoom
 (gate "cave": Render.CAVE_G, Render:SetCaveZoom, /unroll cavezoom; hidden again
@@ -130,7 +130,7 @@ and the tunnels of the Gnomeregan approach (the city zoom, like Blackrock
 Mountain), drawn from the client's minimap blocks of their WMO, each turned as
 the tunnels lie (Texture:SetRotation), desaturated and tinted over a rock rim
 (EmitBlocks).
-Every cave (3.5.0, Caves.lua): the open world's caves without a Blizzard map -
+Every cave (1.2.0, Caves.lua): the open world's caves without a Blizzard map -
 about 260: dens, mines, ogre mounds, hives, barrow dens, crypts, tunnels - drawn
 as Gnomeregan from their own minimap blocks, by the cave switch. With that many:
 a cave is built ahead only near the screen and from 0.9 of its switch (NearScreen,
@@ -139,8 +139,8 @@ most DETAIL_BUILDS_PER_FRAME patches are built in a frame, those on screen
 first; no stage visible in a frame is handed to another (BuildVisible); detail
 levels stack in a fixed order (larger below); the zoom readout sums up the caves
 in view.
-A cave's own switch (3.6.0): the lower of the cave switch (Render.CAVE_G: world
-zoom 30 since 3.6.2, 52 in 3.6.0) and the deepest zoom the wheel reaches over the
+A cave's own switch (1.2.0): the lower of the cave switch (Render.CAVE_G: world
+zoom 30; 52 in a beta) and the deepest zoom the wheel reaches over the
 cave (CaveSwitch: Core's depth limit, maxZoom past the deepest map at the cave's
 centre - at the default depth less than 30x for 34 caves in 5 zones, from
 Winterspring's 25.28x to Mulgore's 29.17x), so every cave shows, at the deepest
@@ -148,6 +148,15 @@ zoom over it at most.
 The caves around several instance portals (Maraudon, the Scarlet Monastery) and
 the Timbermaw Hold tunnels go with the city maps, as Gnomeregan does (Caves.lua:
 no gate).
+The minimap imagery (1.3.0, MinimapLayer.lua, the setting "imagery"): the map's
+art drawn from the client's own minimap tiles, in one frame on the overlay's own
+level - the world picture's, which it replaces. Render:Draw asks it first; while
+it shows (dMM) Consider leaves out every parchment base, cell, piece and core,
+keeps the city maps only of the capitals underground (MinimapLayer.KEEP_CITY:
+Ironforge, Undercity) without their home zones' banner covers, and the detail
+levels without their parchment covers (BuildCityLod, BuildDetailLod); its
+backdrop loaded is the frame's readiness (FindCovers) and no banner is printed
+(BannerShown).
 ]]
 
 local Render = {}
@@ -170,7 +179,7 @@ local FOCUS_FADE = 0.25             -- crossfade when the focus zone/continent c
 local MAX_STAGES = 24
 local FOOT_BUILDS_PER_FRAME = 3
 local CELL_BUILDS_PER_FRAME = 8     -- a cell is one mask and a dozen tiles: cheap
-local DETAIL_BUILDS_PER_FRAME = 6   -- (3.5.0) detail-level patches (a cave: a few blocks and a mask), on-screen ones first
+local DETAIL_BUILDS_PER_FRAME = 6   -- (1.2.0) detail-level patches (a cave: a few blocks and a mask), on-screen ones first
 local CELL_RECT_TOL = 2e-4          -- a mask fits while the zone rect is within this
 local RING_PX = 48                  -- the zone frame fades out as the view leaves the zone
 local RING_FADE = 0.15              -- ...but never faster than this (s), however fast you zoom
@@ -189,17 +198,17 @@ local CORE_K0, CORE_K1 = 0.9, 1.0   -- continent alpha over which the exact LOD 
 -- A single notch across the switch, a slow zoom or a rest: the timed fade.
 local CITY_IN, CITY_OUT = 1.5, 1.35
 local CITY_FADE = 0.3
-local CITY_BAND, CITY_FADE_MIN = 1.15, 0.12 -- (3.1.0: 0.12, was 0.1 - at 60 fps no frame steps more than 0.14)
+local CITY_BAND, CITY_FADE_MIN = 1.15, 0.12 -- (1.0.0: 0.12, was 0.1 - at 60 fps no frame steps more than 0.14)
 local CITY_PREFETCH = 1.0           -- build/load the city patch from here (or when a zoom in heads past CITY_IN)
--- (3.5.0) A cave's patch (~300 caves, many small and close together) is built ahead from CAVE_PREFETCH - 0.9 of its
+-- (1.2.0) A cave's patch (~300 caves, many small and close together) is built ahead from CAVE_PREFETCH - 0.9 of its
 -- switch: world zoom 27 at the default 30 - and only for the caves within CAVE_AHEAD of a screen around the view
 -- (NearScreen), not every cave within a whole view from 2/3 of the switch as a city; or where a zoom in is heading.
 local CAVE_PREFETCH, CAVE_AHEAD = CITY_IN * 0.9, 0.25
--- (3.1.0) ONE global switch: every city / detail map shows from WORLD zoom cityG (ns.WorldZoom: 1.00x = the whole world
+-- (1.0.0) ONE global switch: every city / detail map shows from WORLD zoom cityG (ns.WorldZoom: 1.00x = the whole world
 -- map fills the view) and hides again below cityG * Render.CITY_G_HIDE, wherever the camera is. nil (/unroll cityzoom off):
--- CITY_IN / CITY_OUT of each city's own home zone (the rule up to 3.0.1).
+-- CITY_IN / CITY_OUT of each city's own home zone (the rule before 1.0.0).
 local cityG = 14.05
-local caveG = 30 -- (3.4.0) the WORLD zoom from which the caves show (Caves.lua, gate "cave"; 3.6.2: 30 - 3.6.0 52, 3.4.0 20); nil: never
+local caveG = 30 -- (1.2.0) the WORLD zoom from which the caves show (Caves.lua, gate "cave"; 30 - the betas tried 20 and 52); nil: never
 local TILE = 256
 
 -- Frame level offsets (above the overlay's own level), bottom to top;
@@ -207,16 +216,16 @@ local TILE = 256
 local LV_WORLD, LV_CONT, LV_FOOT = 0, 1, 2
 
 Render.FADE_Z0, Render.FADE_Z1 = BASE_Z0, BASE_Z1 -- (kept for other modules)
--- (3.1.0) The default world zoom of the city switch (measured in game by the user with /unroll zoom) and how far below it
+-- (1.0.0) The default world zoom of the city switch (measured in game by the user with /unroll zoom) and how far below it
 -- the maps hide again: just enough that a view resting on the line cannot blink (a settle moves the zoom by 4e-8). Every
 -- zone's own default view (Elwynn 12.88x, Hillsbrad 13.97x) lies below the band, so what shows there never depends on
 -- where the zoom came from.
 Render.CITY_G, Render.CITY_G_HIDE = cityG, 0.995
--- (3.1.2) The highest switch the cityzoom command takes: just below the lowest world zoom at which the view can lie inside a
+-- (1.0.0) The highest switch the cityzoom command takes: just below the lowest world zoom at which the view can lie inside a
 -- capital (Stormwind 25.72x; a window taller than the map's 3:2 only raises it). Above that a capital could get the
 -- focus and be the real map - its own map at rest - while its switch is still off.
 Render.CITY_G_MAX = 25
--- (3.4.0) The caves' switch (Caves.lua, gate "cave"): its default, and the lowest (3.5.0: below 10x a view holds
+-- (1.2.0) The caves' switch (Caves.lua, gate "cave"): its default, and the lowest (below 10x a view holds
 -- a hundred caves and more) and the highest world zoom the cavezoom command takes.
 Render.CAVE_G, Render.CAVE_G_MIN, Render.CAVE_G_MAX = caveG, 10, 60
 -- The switch's "off" value in the units ns.CityZoomOf returns.
@@ -239,7 +248,7 @@ local ringSeen = {}
 local picVis = {}      -- [mapID] = tick of the last Draw that showed its picture
 local picOrder = {}   -- [mapID] = stacking order of visible zone pictures
 local picSeq = 0
-local picLow = 0      -- (3.1.0) order numbers below every picture showing (PlanLevels: the real map's own picture)
+local picLow = 0      -- (1.0.0) order numbers below every picture showing (PlanLevels: the real map's own picture)
 local picSeen, pics = {}, {}
 local prefetch        -- {x, y, vw}: where a zoom in is heading
 local fadeTime = FOCUS_FADE
@@ -251,7 +260,7 @@ local hasGradient = nil
 local emitStrips = CORNER_STRIPS
 local contT, needCore, cores = {}, {}, {}
 local liftLo, liftHi, liftMap, liftID -- see Render:SetRestLift
-local cityLayer                       -- (3.1.1) where lifted parts live (Render:SetCityLayer, Core's Setup)
+local cityLayer                       -- (1.0.0) where lifted parts live (Render:SetCityLayer, Core's Setup)
 -- (CityFades; a city: a capital or a detail level - Dalaran, Blackrock Mountain, Gnomeregan, a cave)
 local cityL, cityLVis, cityPre = {}, {}, {} -- [cityID] = eased fade of a city's patch; tick last shown; build / load it
 local cityOn = {}                            -- [cityID] = patch switched on (by its switch's zoom, with hysteresis)
@@ -261,6 +270,7 @@ local homeOfCity, cityOfHome                 -- [city id] = its home zone's entr
 local virt = {}                              -- [id] = virtual map entry of a detail level (DetailEntry, CityLinks)
 local xfK, xfKy, xfX, xfY                    -- Emit: layer-px transform (another map's art on a part)
 local edgeC                                  -- Emit: extra clip {x0, y0, x1, y1, feather} (a picture's edge)
+local dMM = false                            -- (1.3.0) the minimap imagery is the map's art this frame (MinimapLayer.lua)
 
 function Render:Init(parent)
     overlay = parent
@@ -271,7 +281,7 @@ function Render:SetLevelCap(cap)
     levelCap = cap
 end
 
--- (3.1.1) The frame lifted parts go to: a clipping frame of its own above Blizzard's map art pins (Core's Setup).
+-- (1.0.0) The frame lifted parts go to: a clipping frame of its own above Blizzard's map art pins (Core's Setup).
 function Render:SetCityLayer(f)
     cityLayer = f
 end
@@ -305,7 +315,7 @@ end
 function Render:MarkArtDirty()
     for _, st in pairs(stages) do
         st.piecesDirty, st.topDirty = true, true
-        -- (3.5.0) a detail level's patch shows explored art only through its cover (Dalaran): a cave's never changes
+        -- (1.2.0) a detail level's patch shows explored art only through its cover (Dalaran): a cave's never changes
         local e = st.e
         if not (e and e.virtual and not e.detail.cover) then st.lodDirty = true end
     end
@@ -342,7 +352,7 @@ local function BeginPart(f, keepLoaded)
     f.n, f.nm = 0, 0
     wipe(f.outer)
     f.outerA = nil
-    if f.patch then -- (3.1.0: the mosaic's banner covers, see Render.PatchQuads)
+    if f.patch then -- (1.0.0: the mosaic's banner covers, see Render.PatchQuads)
         wipe(f.patch)
         wipe(f.patchOut)
         f.patchA = nil
@@ -420,7 +430,7 @@ local function NextTex(f, sub)
         tex:RemoveMaskTexture(tex.maskRef)
         tex.maskRef = nil
     end
-    if tex.turned then -- (3.4.0, EmitBlocks: a minimap block - its turn and its grey go with it)
+    if tex.turned then -- (1.2.0, EmitBlocks: a minimap block - its turn and its grey go with it)
         if tex.SetRotation then tex:SetRotation(0) end
         if tex.SetDesaturated then tex:SetDesaturated(false) end
         tex.turned = nil
@@ -697,7 +707,7 @@ end
 -- from afar) or st.top (the same pieces on top of the zone's picture).
 -- Texture alpha of a part's textures outside its continent's opaque core
 -- (not covered by the continent's core copy, so they fade per texture).
--- (3.1.0) pa: alpha of the part's city-banner covers (Render.PatchQuads) - the city switch's fade; those of them outside
+-- (1.0.0) pa: alpha of the part's city-banner covers (Render.PatchQuads) - the city switch's fade; those of them outside
 -- the core take both.
 local function SetOuter(f, r, pa)
     r = math.floor(r * 255 + 0.5) / 255
@@ -716,7 +726,7 @@ local function SetOuter(f, r, pa)
     end
 end
 
--- (3.1.0) The textures f.pool[n0 + 1 .. f.n] are a city banner's cover in the mosaic (BuildCell, BuildPieces). They show
+-- (1.0.0) The textures f.pool[n0 + 1 .. f.n] are a city banner's cover in the mosaic (BuildCell, BuildPieces). They show
 -- only while the city's own map does (SetOuter's pa: the city switch's fade): below the switch the mosaic is the zone as
 -- Blizzard draws it, banner included, wherever the camera is. o0 = #f.outer before they were emitted (those outside
 -- the continent's core leave f.outer: SetOuter gives them both alphas).
@@ -758,7 +768,7 @@ local function BuildPieces(st, f, split, cell)
         -- city banners in the explored art: covered with the pieces' own art
         -- from src (see BuildCell), on top of the pieces - or with the base
         -- picture's (pbase: a banner drawn out over the sea, where no
-        -- explored art lies below it). (3.1.0) Shown only above the city switch (Render.PatchQuads).
+        -- explored art lies below it). (1.0.0) Shown only above the city switch (Render.PatchQuads).
         emitStrips = PATCH_STRIPS
         local n0, o0 = f.n, #f.outer
         for _, p in ipairs(cell and ns.ZoneMaskPatches and ns.ZoneMaskPatches[e.id] or {}) do
@@ -880,10 +890,10 @@ local function CellOf(e)
     return c or nil
 end
 
--- (3.2.0) Does zone e still draw its picture's BASE (layer 4)? Only a capital - its own map at rest inside it - and a
+-- (1.0.1) Does zone e still draw its picture's BASE (layer 4)? Only a capital - its own map at rest inside it - and a
 -- zone the mosaic cannot draw: no fitting cell (Classic Era, maps whose art changed) or cells / mosaic switched off,
 -- where the footprints leave its unexplored land to the continent's blurry art. Every other zone's land is its cell,
--- the open sea by its coast too (the 3.2.0 masks): its base would only cover the neighbours with blank parchment.
+-- the open sea by its coast too (the 1.0.1 masks): its base would only cover the neighbours with blank parchment.
 local function WholePicture(e)
     local c = (ns.db == nil or (ns.db.cells ~= false and ns.db.mosaic ~= false)) and CellOf(e)
     return not (c and c.kind == "zone")
@@ -892,7 +902,7 @@ end
 -- Cell: the zone's base picture inside its cell - ONE mask for the whole
 -- picture (all tiles share it). City banners printed on the picture outside
 -- the city's own cell are painted over with the zone's own art (patches) -
--- (3.1.0) above the city switch only (Render.PatchQuads).
+-- (1.0.0) above the city switch only (Render.PatchQuads).
 local function BuildCell(st, cell, split)
     local e, f = st.e, st.foot
     DetachMasks(f)
@@ -922,12 +932,12 @@ local function BuildCell(st, cell, split)
     EndPart(f)
 end
 
--- (3.1.0) A capital's cell in the mosaic: its HOME ZONE's base picture through the city's cell mask (the hole the
+-- (1.0.0) A capital's cell in the mosaic: its HOME ZONE's base picture through the city's cell mask (the hole the
 -- city's cell leaves in its parent's), so below the city switch the mosaic is the zone as Blizzard draws it, banner
 -- included, wherever the camera is - the city's own map is only its patch (BuildCityLod), switched by the zoom alone.
--- (3.1.2) Where the home zone's picture does not reach (the north half of Orgrimmar's cell lies outside Durotar's map)
+-- (1.0.0) Where the home zone's picture does not reach (the north half of Orgrimmar's cell lies outside Durotar's map)
 -- the cell stays empty: the continent's art shows there, as in the strip beside it, under a soft edge of the zone's -
--- never the city's own map below the switch (up to 3.1.1 the city's art stayed there).
+-- never the city's own map below the switch (before 1.0.0 the city's art stayed there).
 local function BuildCityFill(st, h, cell, split)
     local e, f = st.e, st.foot
     DetachMasks(f)
@@ -978,7 +988,7 @@ end
 -- zone's cell mask fits this client (WoW Forever, the art the data was made
 -- for); nil otherwise. Its art: a ns.DUNGEON_CAVES picture (4 x 3 tiles of
 -- 256 on 1002 x 668), or its own grid (def.art: lw x lh layer px of tw x th
--- tiles, row by row - Dalaran's minimap tiles), or (3.4.0) the client's minimap
+-- tiles, row by row - Dalaran's minimap tiles), or (1.2.0) the client's minimap
 -- blocks (def.art.blocks: Gnomeregan's tunnels and the minimap caves, EmitBlocks);
 -- the level under it: a ns.DUNGEON_CAVES picture or (under.art: the caves of
 -- Caves.lua) 12 tiles of its own on that 1002 x 668 picture.
@@ -998,14 +1008,14 @@ local function DetailEntry(def)
         mapType = ns.MAPTYPE_ZONE, parent = def.home, home = h,
         x0 = x0, x1 = x1, y0 = y0, y1 = y1, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2,
         lw = lw, lh = lh, tw = tw, th = th, area = (x1 - x0) * (y1 - y0), nest = 99, order = 100000,
-        tiles = c.t, blocks = c.blocks, tint = c.tint, rimC = c.rim, gate = def.gate, -- (3.4.0: Caves.lua)
+        tiles = c.t, blocks = c.blocks, tint = c.tint, rimC = c.rim, gate = def.gate, -- (1.2.0: Caves.lua)
     }
     ns.SetStretch(e)
-    -- (3.6.0) a cave: the map the wheel's depth limit over it counts from (CaveSwitch)
+    -- (1.2.0) a cave: the map the wheel's depth limit over it counts from (CaveSwitch)
     if def.gate == "cave" then e.deepMap = ns.DeepestMapAt(e.cx, e.cy) end
     -- the level drawn under it: its rect the same way
     local u = def.under
-    local uc = u and (u.art or (ns.DUNGEON_CAVES and ns.DUNGEON_CAVES[u.cave])) -- (3.4.0: or its own grid)
+    local uc = u and (u.art or (ns.DUNGEON_CAVES and ns.DUNGEON_CAVES[u.cave])) -- (1.2.0: or its own grid)
     if uc and uc.t and #uc.t == 12 then
         local ux0, uy0 = ns.WorldPosToMap(uc.m, uc.r[3], uc.r[4])
         local ux1, uy1 = ns.WorldPosToMap(uc.m, uc.r[1], uc.r[2])
@@ -1077,7 +1087,7 @@ end
 -- as the picture's top (and Blizzard's exploration pin) draws them.
 local function BuildHomeCover(st)
     local e, f = st.e, st.lod
-    BeginPart(f, true) -- (3.0.0: a rebuild - an exploration update - keeps the loaded fade, as BuildDetailLod does)
+    BeginPart(f, true) -- (1.0.0: a rebuild - an exploration update - keeps the loaded fade, as BuildDetailLod does)
     f.ring = f.ring or {}
     wipe(f.ring)
     f.ringA = nil
@@ -1116,8 +1126,8 @@ end
 local function BuildCityLod(st, h)
     local e, f = st.e, st.lod
     DetachMasks(f)
-    BeginPart(f, true) -- (3.0.0: a rebuild keeps the loaded fade - before, the patch vanished at rest until the next input)
-    f.ring = f.ring or {} -- (3.1.0: the banner covers, shown by SetRing only while they are needed - see LodAlphas)
+    BeginPart(f, true) -- (1.0.0: a rebuild keeps the loaded fade - before, the patch vanished at rest until the next input)
+    f.ring = f.ring or {} -- (1.0.0: the banner covers, shown by SetRing only while they are needed - see LodAlphas)
     wipe(f.ring)
     f.ringA = nil
     local lw, lh, tw, th, files = BaseLayout(e.id)
@@ -1131,7 +1141,8 @@ local function BuildCityLod(st, h)
         local Y0 = (e.y0 - h.y0) / (h.y1 - h.y0) * hh
         local kx = lw / (X1 - X0)
         local kyr = kx * hky / ky -- (so the zone's rows land where its own picture draws them)
-        local patches = ns.ZoneMaskPatches and ns.ZoneMaskPatches[h.id]
+        -- (1.3.0: no banner covers over the minimap imagery - there is no parchment banner to cover)
+        local patches = not dMM and ns.ZoneMaskPatches and ns.ZoneMaskPatches[h.id]
         if patches then
             local m = NextMask(f)
             SetMaskFile(m, hcell.file)
@@ -1146,7 +1157,7 @@ local function BuildCityLod(st, h)
             emitStrips = CORNER_STRIPS
             xfK = nil
         end
-        -- (3.6.2) A city whose map holds land no zone cell covers (Orgrimmar, Stormwind) takes that too: its patch mask.
+        -- (1.2.0) A city whose map holds land no zone cell covers (Orgrimmar, Stormwind) takes that too: its patch mask.
         -- The emblems its map prints there: copies of its own plain art under the patch (through the whole patch, pcover),
         -- whose own mask has them carved out - where the patch is translucent the two crossfade, never double up.
         local covers = cell.pcover and ns.CityPatchCovers and ns.CityPatchCovers[e.id]
@@ -1195,7 +1206,7 @@ local function DetailXf(e, R)
     return kx, xfKy, X0, Y0
 end
 
--- (3.4.0, Caves.lua: Gnomeregan's tunnels; 3.5.0: the minimap caves) A level drawn from the client's own minimap
+-- (1.2.0, Caves.lua: Gnomeregan's tunnels and the minimap caves) A level drawn from the client's own minimap
 -- blocks: the rock colour over the level's nonzero box (its mask leaves a rim of it around the floor), then each block
 -- whole, centred on its point and turned as its WMO lies (Texture:SetRotation about its centre - this client's own UI
 -- turns textures so: AddonList.lua, BuffFrame.lua), desaturated and tinted; the lower level first (sublevel 0), the
@@ -1248,7 +1259,7 @@ local function BuildDetailLod(st)
                 if PieceShown(h.id, q) then rects[#rects + 1] = p break end
             end
         end
-        if #rects > 0 then
+        if #rects > 0 and not dMM then -- (1.3.0: none over the minimap imagery)
             local hw, hh, htw, hth, hfiles = BaseLayout(h.id)
             local list
             if cv.explored then list = ExploredList(h.id) else list = AllOverlays(h.id) end
@@ -1387,14 +1398,14 @@ function ns.ZoomOf(v, e, vw)
     return (e.x1 - e.x0) * ppx / (e.lw * ns.FitOf(v, e))
 end
 
--- (3.0.1) Zoom of the whole world map (1 = Azeroth fills the view): the one global zoom number.
+-- (1.0.0) Zoom of the whole world map (1 = Azeroth fills the view): the one global zoom number.
 function ns.WorldZoom(v, vw)
     local w = ns.maps and ns.maps[ns.WORLD_MAP_ID]
     if w then return ns.ZoomOf(v, w, vw) end
     return 1 / vw
 end
 
--- (3.0.1) The zoom the city switch compares with CITY_IN / CITY_OUT / CITY_PREFETCH: the home zone's own zoom, or -
+-- (1.0.0) The zoom the city switch compares with CITY_IN / CITY_OUT / CITY_PREFETCH: the home zone's own zoom, or -
 -- with a world-zoom switch set (Render:SetCityZoom) - the world zoom scaled so that it reads CITY_IN exactly at it.
 function ns.CityZoomOf(v, h, vw)
     if cityG then return CITY_IN * ns.WorldZoom(v, vw) / cityG end
@@ -1612,8 +1623,16 @@ local function Consider(e)
             end
         end
     end
+    -- (1.3.0) The minimap imagery (MinimapLayer.lua) is the map's art: no parchment base, cell, piece or core, no banner
+    -- cover; the detail levels as they are and the city maps of the capitals the surface imagery cannot show (KEEP_CITY)
+    if dMM and not e.virtual then
+        local keep = ns.MinimapLayer.KEEP_CITY[e.id]
+        if not keep then baseA, loadBase = 0, false end
+        if lodRole == "home" or not keep then lodRole, lodL, loadLod = nil, 0, false end
+        footA, pieceA, loadFoot, loadPieces, loadCore = 0, 0, false, false, false
+    end
     if not onScreen then
-        -- (3.1.0) A city / detail map within one view of the screen: its patch - and a capital's cell in the mosaic -
+        -- (1.0.0) A city / detail map within one view of the screen: its patch - and a capital's cell in the mosaic -
         -- are built and loaded ahead, hidden, so they are there when a drag or a fling brings the city into view (no
         -- pop-in at the screen's edge). Nothing else of it, and nothing of it is placed on a level.
         if not (lodRole == "city" and (loadLod or loadFoot)) or not NearScreen(e, 1) then return end
@@ -1633,7 +1652,7 @@ local function Consider(e)
     it.loadCore, it.lod = loadCore, lod
     it.sx0, it.sy0, it.sx1, it.sy1 = sx0, sy0, sx1, sy1
     it.focused = (e.id == focusID)
-    it.whole = kind ~= "zone" or WholePicture(e) -- (3.2.0: does its base draw?)
+    it.whole = kind ~= "zone" or WholePicture(e) -- (1.0.1: does its base draw?)
     -- The zone's frame shows while the view stays inside the zone (as on
     -- Blizzard's map) and fades out as the view extends past its edges
     -- (target here; eased in time in Render:Draw).
@@ -1648,7 +1667,7 @@ end
 -- engine assert in CSimpleRender.cpp and crashes the client.)
 local function Place(f, it, scale, alpha, level, cap)
     if f.fading then dbusy = true end
-    -- (3.1.1) a lifted part (cap given: LiftPictures) lives in the city layer - only a clipping frame of its own draws
+    -- (1.0.0) a lifted part (cap given: LiftPictures) lives in the city layer - only a clipping frame of its own draws
     -- above the canvas' pins in the client - everything else in the overlay; levels in the city layer count from it
     local host = (cap and cityLayer) or overlay
     if f:GetParent() ~= host then
@@ -1657,7 +1676,7 @@ local function Place(f, it, scale, alpha, level, cap)
     end
     if host == cityLayer then
         level, cap = (cityLayer.level or 0) + 1 + level - (liftLo or level), 1e9
-        if level <= (cityLayer.level or 0) then level = (cityLayer.level or 0) + 1 end -- (3.1.2: never under its layer)
+        if level <= (cityLayer.level or 0) then level = (cityLayer.level or 0) + 1 end -- (1.0.0: never under its layer)
     end
     f:SetScale(scale)
     f:ClearAllPoints()
@@ -1701,7 +1720,7 @@ local function UseCells()
     return ns.db == nil or (ns.db.cells ~= false and ns.db.mosaic ~= false)
 end
 
--- (3.6.0) The caves' switch where the deepest map is m (a cave's: e.deepMap): the cave zoom, or the deepest world zoom
+-- (1.2.0) The caves' switch where the deepest map is m (a cave's: e.deepMap): the cave zoom, or the deepest world zoom
 -- the wheel reaches there where that is less (Core's depth limit: maxZoom past the deepest map at a point); nil while
 -- the caves are off. The limits by map, for the frame (deepZ: CityFades wipes it).
 local deepZ = {}
@@ -1762,7 +1781,7 @@ local function CityFades(ddt)
     wipe(deepZ)
     local wz, wzPf = ns.WorldZoom(dv, dcam.vw), pfvw and ns.WorldZoom(dv, pfvw)
     for cid, h in pairs(homeOfCity) do
-        -- (3.4.0) a cave (Caves.lua) by its own switch, hidden just below it whatever the city rule
+        -- (1.2.0) a cave (Caves.lua) by its own switch, hidden just below it whatever the city rule
         local e = virt[cid]
         local cave = e ~= nil and e.gate == "cave"
         local z, zPf -- (zPf: where a zoom in is heading)
@@ -1775,7 +1794,7 @@ local function CityFades(ddt)
         end
         local zo = cave and CITY_IN * Render.CITY_G_HIDE or zOut
         local on = cityOn[cid]
-        -- (3.5.0 - 1e-9: a view opened at exactly the switch's zoom - M at a cave's switch, or the wheel at the depth
+        -- (1.2.0 - 1e-9: a view opened at exactly the switch's zoom - M at a cave's switch, or the wheel at the depth
         -- limit that is one - is past it, whatever the rounding of its width)
         if on then on = z > zo else on = z >= CITY_IN - 1e-9 end
         cityOn[cid] = on
@@ -1796,7 +1815,7 @@ local function CityFades(ddt)
         cityL[cid] = a
         if a ~= target then dbusy = true end
         local pre = a > 0 or z >= (cave and CAVE_PREFETCH or CITY_PREFETCH)
-        if pre and cave and not NearScreen(e, CAVE_AHEAD) then pre = false end -- (3.5.0: every cave is on past its switch)
+        if pre and cave and not NearScreen(e, CAVE_AHEAD) then pre = false end -- (1.2.0: every cave is on past its switch)
         if not pre and pfvw then
             local c = ns.maps[cid] or e
             if c and c.x0 < pfx1 and pfx0 < c.x1 and c.y0 < pfy1 and pfy0 < c.y1 then
@@ -1805,7 +1824,7 @@ local function CityFades(ddt)
         end
         cityPre[cid] = pre
     end
-    -- (the detail levels aren't in ns.drawList: considered here, with the cities - 3.5.0: those that show or load,
+    -- (the detail levels aren't in ns.drawList: considered here, with the cities - 1.2.0: those that show or load,
     -- cityPre; for the others, most caves most of the time, Consider adds nothing: a detail level is never the focus
     -- and its own picture never shows)
     for id, e in pairs(virt) do
@@ -1814,7 +1833,7 @@ local function CityFades(ddt)
 end
 
 -- Build the city patches and banner covers that are needed (after
--- BuildVisible: every visible map has its stage and layout); (3.5.0) at most
+-- BuildVisible: every visible map has its stage and layout); (1.2.0) at most
 -- DETAIL_BUILDS_PER_FRAME detail levels a frame, those showing first, the rest
 -- in the next frames (a patch draws nothing until it is built).
 local function BuildLods(n)
@@ -1855,7 +1874,7 @@ local function LodAlphas(n, now)
             local f = st.lod and PartFade(st.lod, it.loadLod and st.hasLod, now) or 0
             if it.lodRole == "city" then
                 it.lodCity = it.e.id
-                -- (3.1.0) A capital's own banner covers show only where the banner is not covered already: while
+                -- (1.0.0) A capital's own banner covers show only where the banner is not covered already: while
                 -- Blizzard's canvas draws the home zone's explored pieces over our band (it is the real map: the patch
                 -- is lifted above them) as far as the home zone's own cover (on its picture, lifted first) is not
                 -- there; and on the home zone's picture while that cover is still loading. Everywhere else the banner
@@ -1868,11 +1887,11 @@ local function LodAlphas(n, now)
                     local seen = hs and hs.covT and hs.covT >= tick - 1 -- (this frame or, drawn after us, the last one)
                     SetRing(st.lod, math.max((liftMap == h.id) and (1 - (seen and hs.covA or 0)) or 0, seen and hs.covB or 0))
                 end
-                -- (3.1.0: the lesser of the switch's fade and the loading fade, not their product - while both run, in
+                -- (1.0.0: the lesser of the switch's fade and the loading fade, not their product - while both run, in
                 -- a fast spin, the product stepped up to 0.23 a frame)
                 it.lodA = math.min(math.max(it.lodL, it.baseA), f)
-                -- (3.1.0: likewise the lesser of the focus fade and the ring's, not their product)
-                -- (3.1.2) The patch's art counts once it has loaded, wanted or not: below the switch the patch is no
+                -- (1.0.0: likewise the lesser of the focus fade and the ring's, not their product)
+                -- (1.0.0) The patch's art counts once it has loaded, wanted or not: below the switch the patch is no
                 -- longer wanted (f = 0), and the picture of a city the view had left came back for a few frames after a
                 -- fast zoom-out from inside it (up to 0.1: the rest of its own fade).
                 local fc = f
@@ -1881,7 +1900,7 @@ local function LodAlphas(n, now)
                 it.baseA, it.topB = math.min(it.baseA, g), math.min(it.topB, g)
             else
                 it.lodCity = cityOfHome[it.e.id].id
-                it.lodA = math.min(it.lodL, f) -- (3.1.0: the lesser, as above; and of the picture's alpha, see Render:Draw)
+                it.lodA = math.min(it.lodL, f) -- (1.0.0: the lesser, as above; and of the picture's alpha, see Render:Draw)
                 it.patchA = cityL[it.lodCity] or 0 -- (the mosaic's banner covers of this zone, see SetOuter)
                 -- (how far this zone's cover is there, and how much of its picture's banner it leaves: see above)
                 st.covT, st.covA, st.covB = tick, f * it.baseA, it.baseA * (1 - f)
@@ -1893,7 +1912,7 @@ end
     -- Build what's needed (footprints are heavy: a couple per frame).
 local function BuildVisible(n)
     dbuilds = 0
-    -- (3.5.0) Every stage shown in this frame is in use before any is handed out: GetStage gives a new map the stage
+    -- (1.2.0) Every stage shown in this frame is in use before any is handed out: GetStage gives a new map the stage
     -- unused the longest, and a detail level later in the list - they all rank last - would lose its stage to one before
     -- it (a cave blinking out and in, and taking the next one's stage in turn).
     for i = 1, n do
@@ -1987,7 +2006,7 @@ local function EaseRings(n, ddt)
     end
 end
 
-local function FindCovers(n, world)
+local function FindCovers(n, world, mmReady)
     -- Hide whatever an opaque picture completely covers.
     local coverAll, coverWorld, worldIn = false, false, world == nil
     for i = 1, n do
@@ -2001,11 +2020,11 @@ local function FindCovers(n, world)
             worldIn = true
         end
     end
-    dready = worldIn or coverWorld or coverAll
+    dready = worldIn or coverWorld or coverAll or mmReady == true -- (1.3.0: the minimap imagery's backdrop loaded)
     return coverAll, coverWorld
 end
 
--- (3.1.0) Is any city banner of visible home zone `it` (ns.ZoneMaskPatches, with its feather) on screen?
+-- (1.0.0) Is any city banner of visible home zone `it` (ns.ZoneMaskPatches, with its feather) on screen?
 function Render.BannerOnScreen(it)
     local e = it.e
     local s = (it.sx1 - it.sx0) / e.lw
@@ -2040,7 +2059,7 @@ local function PlanLevels(n, coverAll)
             -- (a capital's patch alone also makes it a picture; a home zone's
             -- banner cover only shows with the zone's picture)
             local showLod = it.lodA > 0.002 and st.hasLod and st.lod.n > 0
-            -- (3.1.0: a home zone's banner cover takes a level only while its banner is on screen - with one switch
+            -- (1.0.0: a home zone's banner cover takes a level only while its banner is on screen - with one switch
             -- for all cities every home zone's cover is on above the line, and the lift band has six levels)
             if showLod and it.lodRole == "home" and not Render.BannerOnScreen(it) then showLod = false end
             if showPic or (showLod and it.lodRole == "city") then
@@ -2060,7 +2079,7 @@ local function PlanLevels(n, coverAll)
         if not picOrder[id] then
             local c = it.lodRole == "home" and it.lodCity
             if id == liftMap and next(picOrder) then
-                -- (3.1.0) the real map's own picture appears at rest / in the canvas: UNDER every picture showing. On
+                -- (1.0.0) the real map's own picture appears at rest / in the canvas: UNDER every picture showing. On
                 -- top, the older pictures - lifted above Blizzard's exploration overlay until now - would all drop
                 -- under that overlay in this one frame, while they still show (LiftPictures lifts what lies after it).
                 picLow = picLow - 1
@@ -2103,13 +2122,13 @@ local function PlanLevels(n, coverAll)
         if not picSeen[id] then picOrder[id] = nil end
     end
     -- (a detail level lies across zones: above every picture, whatever came first)
-    -- (3.1.0) and so does every capital's slot (its patch and its own picture): a zone picture that comes up later -
+    -- (1.0.0) and so does every capital's slot (its patch and its own picture): a zone picture that comes up later -
     -- the focus moved to a neighbour whose map rectangle reaches over the city - never covers a city
     table.sort(pics, function(a, b)
         local ca, cb = a.lodRole == "city", b.lodRole == "city"
         if ca ~= cb then return cb end
         if a.e.virtual ~= b.e.virtual then return b.e.virtual == true end
-        -- (3.5.0) detail levels in a fixed order - the larger below, then by id - not by when they came up: two caves
+        -- (1.2.0) detail levels in a fixed order - the larger below, then by id - not by when they came up: two caves
         -- over the same ground keep their order whatever the panning
         if a.e.virtual then
             if a.e.area ~= b.e.area then return a.e.area > b.e.area end
@@ -2162,7 +2181,7 @@ local function SlotLevels(it, lv)
         return lv + 2
     elseif it.lodRole == "city" then
         it.lodLevel = lv
-        if not it.picShow then return lv + 1 end -- (3.1.0) the patch alone: one level (the lift band has six)
+        if not it.picShow then return lv + 1 end -- (1.0.0) the patch alone: one level (the lift band has six)
         it.picLevel = lv + 1
     else
         it.picLevel, it.lodLevel = lv, lv + 2
@@ -2198,7 +2217,7 @@ local function LiftPictures()
             if it.e.id == liftMap then k0 = k end
         end
     else
-        -- (3.1.1) no explored pieces of the real map under us (a continent, a city, an unexplored zone): the cities and
+        -- (1.0.0) no explored pieces of the real map under us (a continent, a city, an unexplored zone): the cities and
         -- detail maps alone - last in pics - still go over Blizzard's own map art (a continent's zone hover highlight)
         k0 = #pics
         for k, it in ipairs(pics) do
@@ -2239,6 +2258,13 @@ function Render:Draw(cam, v)
         pfx0, pfx1 = prefetch.x - dW / 2 / px, prefetch.x + dW / 2 / px
         pfy0, pfy1 = prefetch.y - dH / 2 / py, prefetch.y + dH / 2 / py
     end
+    -- (1.3.0) the minimap imagery (MinimapLayer.lua), drawn under everything: while it is the map's art, Consider leaves
+    -- the parchment out and its readiness is the frame's (FindCovers)
+    local mmReady, mmBusy = false, false
+    dMM = false
+    if ns.MinimapLayer then dMM, mmReady, mmBusy = ns.MinimapLayer:Draw(cam, v, dppx, dppy, overlay, pfvw, pfx0, pfy0, pfx1, pfy1) end
+    if mmBusy then dbusy = true end
+    if dMM then dfocusReady = true end -- (no zone picture to wait for: the focus changes at once)
     CityFades(ddt)
 
     local world = ns.maps[ns.WORLD_MAP_ID]
@@ -2271,7 +2297,7 @@ function Render:Draw(cam, v)
     EaseRings(n, ddt)
     LodAlphas(n, now)
 
-    local coverAll, coverWorld = FindCovers(n, world)
+    local coverAll, coverWorld = FindCovers(n, world, mmReady)
 
     local footMax, pieceMax = PlanLevels(n, coverAll)
     local baseLevel = overlay:GetFrameLevel() -- the overlay itself draws nothing
@@ -2289,7 +2315,7 @@ function Render:Draw(cam, v)
         if scale > 0 and scale < 1e5 then
             if st.hasBase and it.loadBase then
                 local hidden = (kind == "world" and (coverWorld or coverAll)) or (kind == "continent" and coverAll)
-                    or not it.whole -- (3.2.0: a zone the mosaic draws lays no blank map over its neighbours)
+                    or not it.whole -- (1.0.1: a zone the mosaic draws lays no blank map over its neighbours)
                 if not hidden then
                     local lv
                     if kind == "world" then lv = baseLevel + LV_WORLD
@@ -2304,13 +2330,13 @@ function Render:Draw(cam, v)
             if kind == "zone" and it.picLevel and st.hasTop and st.top.n > 0 then
                 used[st.top] = true
                 Place(st.top, it, scale, it.topA, it.picLevel + 1, it.lifted and liftHi)
-                if not it.whole and it.topA > 0.002 then picVis[it.e.id] = tick end -- (3.2.0: its top is its picture)
+                if not it.whole and it.topA > 0.002 then picVis[it.e.id] = tick end -- (1.0.1: its top is its picture)
             end
             if it.lodLevel then
                 -- (a home zone's banner cover fades with the zone's picture)
                 local a = it.lodA
                 if it.lodRole == "home" then
-                    -- (3.1.0: the lesser of its own fade and the picture's - its top only where the top shows: a zone
+                    -- (1.0.0: the lesser of its own fade and the picture's - its top only where the top shows: a zone
                     -- with no explored pieces has none, and its cover then stepped with the top's faster fade)
                     a = math.min(a, math.max(it.baseA, (st.hasTop and st.top.n > 0) and it.topA or 0))
                     SetRing(st.lod, it.ringA)
@@ -2399,15 +2425,16 @@ function Render:DetailAt(x, y)
     end
 end
 
--- (3.1.0, Core FocusZoneAt) Does capital id draw a patch (its cell masks fit this client and cells are on)?
+-- (1.0.0, Core FocusZoneAt) Does capital id draw a patch (its cell masks fit this client and cells are on)?
 function Render:HasCityPatch(id)
     return dCityOn and homeOfCity ~= nil and homeOfCity[id] ~= nil and not virt[id]
 end
 
--- (3.1.0) Does home zone h's picture print its city's name banner now? Dun Morogh's, Elwynn's and Teldrassil's base
+-- (1.0.0) Does home zone h's picture print its city's name banner now? Dun Morogh's, Elwynn's and Teldrassil's base
 -- pictures print it; Durotar's, Mulgore's and Tirisfal's only with the explored piece that lies over the banner.
 Render.BANNER_IN_BASE = { [1426] = true, [1429] = true, [1438] = true }
 function Render.BannerShown(h)
+    if dMM then return false end -- (1.3.0: the minimap imagery prints no banner)
     local t = Render.bannerOn
     if not t then
         t = {}
@@ -2434,10 +2461,10 @@ function Render.BannerShown(h)
     return on
 end
 
--- (3.1.0, Labels.lua) How much of capital id's name label shows: all of it while the city's own map does (the patch);
+-- (1.0.0, Labels.lua) How much of capital id's name label shows: all of it while the city's own map does (the patch);
 -- none while its home zone's drawing prints the name itself - the banner, readable once the zone's own name label has
 -- given way (zone zoom 0.45 - 0.7) - so the name is never on the map twice. By the zoom alone, like the switch.
--- (3.1.0 review) Second value: true while that is the switch's timed fade (the patch half-faded), false when the zoom
+-- (1.0.0 review) Second value: true while that is the switch's timed fade (the patch half-faded), false when the zoom
 -- band decides - a label part-faded by the zoom keeps its place like every other label (Labels.lua placedSoft).
 function Render:CityNameFade(id, v, vw)
     local h = dCityOn and homeOfCity and not virt[id] and homeOfCity[id]
@@ -2447,26 +2474,26 @@ function Render:CityNameFade(id, v, vw)
     return z, false
 end
 
--- (3.0.1) The WORLD zoom (ns.WorldZoom) from which every city's own map shows; (3.1.0) the default (Render.CITY_G), and
--- they hide again just below it (Render.CITY_G_HIDE). nil / false / 0: the rule up to 3.0.1 - 1.5x of each city's own
+-- (1.0.0) The WORLD zoom (ns.WorldZoom) from which every city's own map shows; the default (Render.CITY_G), and
+-- they hide again just below it (Render.CITY_G_HIDE). nil / false / 0: the rule before 1.0.0 - 1.5x of each city's own
 -- home zone.
 function Render:SetCityZoom(g)
     g = tonumber(g)
     local was = cityG
     if g and g > 0 then
-        if g < 1 then g = 1 elseif g > Render.CITY_G_MAX then g = Render.CITY_G_MAX end -- (3.1.2: was 400)
+        if g < 1 then g = 1 elseif g > Render.CITY_G_MAX then g = Render.CITY_G_MAX end -- (1.0.0: was 400)
         cityG = g
     else
         cityG = nil
     end
-    -- (3.1.0 review) A new switch while the map is drawn (/unroll cityzoom N, default, off, /unroll reset): the slash command
+    -- (1.0.0 review) A new switch while the map is drawn (/unroll cityzoom N, default, off, /unroll reset): the slash command
     -- draws at once and the driver again in the same frame - the first of them measured its fade step from the last
     -- draw, seconds ago (0.05 s, the cap), so a city on screen stepped 0.22 in one shown frame. Its fade starts here.
     if cityG ~= was and lastDrawT then lastDrawT = GetTime() end
 end
 function Render:CityZoom() return cityG, CITY_IN, Render.CityOut() end
 
--- (3.4.0) The WORLD zoom from which the caves show (Caves.lua, gate "cave"; the default Render.CAVE_G, from
+-- (1.2.0) The WORLD zoom from which the caves show (Caves.lua, gate "cave"; the default Render.CAVE_G, from
 -- Render.CAVE_G_MIN to Render.CAVE_G_MAX); nil / false / 0: the caves never show. They hide again just below it
 -- (Render.CITY_G_HIDE).
 function Render:SetCaveZoom(g)
@@ -2482,10 +2509,10 @@ function Render:SetCaveZoom(g)
 end
 function Render:CaveZoom() return caveG end
 
--- (3.0.1, /unroll zoom) The zoom numbers as text lines: the world zoom, the zone under the view's centre and its
+-- (1.0.0, /unroll zoom) The zoom numbers as text lines: the world zoom, the zone under the view's centre and its
 -- continent, every city / detail map in view and whether its map shows, and the switch rule.
 function Render:ZoomLines(cam, v, out)
-    -- (3.1.1) not before the map has a size (this client's Lua raises "Division by zero")
+    -- (1.0.0) not before the map has a size (this client's Lua raises "Division by zero")
     if not (v and v.W and v.H and v.W > 0 and v.H > 0 and cam.vw and cam.vw > 0) then
         out[#out + 1] = "zoom: open the map to see the numbers"
         return
@@ -2513,14 +2540,14 @@ function Render:ZoomLines(cam, v, out)
         local x0, x1 = x - v.W / 2 / ppx, x + v.W / 2 / ppx
         local y0, y1 = y - v.H / 2 / ppy, y + v.H / 2 / ppy
         local first = #out + 1
-        local caves, shown = {}, 0 -- (3.5.0) more than 4 caves in view: one line for them all
+        local caves, shown = {}, 0 -- (1.2.0) more than 4 caves in view: one line for them all
         for cid, h in pairs(homeOfCity) do
             local c = ns.maps[cid] or virt[cid]
             if c and c.x0 < x1 and x0 < c.x1 and c.y0 < y1 and y0 < c.y1 then
                 local name = (c.name and c.name ~= "") and c.name or tostring(cid)
                 local state = cityOn[cid] and "SHOWN" or "hidden"
                 if c.gate == "cave" then
-                    local g = CaveSwitch(c.deepMap, v) -- (3.6.0: its own switch where the wheel stops short of the cave zoom)
+                    local g = CaveSwitch(c.deepMap, v) -- (1.2.0: its own switch where the wheel stops short of the cave zoom)
                     caves[#caves + 1] = g and g < caveG and ("%s: cave %s  (from %.2fx)"):format(name, state, g)
                         or ("%s: cave %s"):format(name, state)
                     if cityOn[cid] then shown = shown + 1 end
@@ -2543,7 +2570,8 @@ function Render:ZoomLines(cam, v, out)
             for i = 1, #t do out[first + i - 1] = t[i] end
         end
     end
-    -- (3.4.0) the caves' switch (before the city rule, which stays the last line); (3.6.0) where the wheel stops short of
+    if ns.MinimapLayer then ns.MinimapLayer:ZoomLines(out) end -- (1.3.0)
+    -- (1.2.0) the caves' switch (before the city rule, which stays the last line); where the wheel stops short of
     -- it at the view's centre, the deepest zoom there
     if caveG then
         local here = CaveSwitch(ns.DeepestMapAt(cam.x, cam.y), v)
@@ -2556,7 +2584,7 @@ function Render:ZoomLines(cam, v, out)
         out[#out + 1] = ("City maps show above zoom %.2fx, everywhere (hide below %.2fx)%s  -  /unroll cityzoom <N> | default | off"):format(
             cityG, cityG * Render.CITY_G_HIDE, cityG == Render.CITY_G and "" or (" - default %.2fx"):format(Render.CITY_G))
     else
-        out[#out + 1] = ("City maps show at %.2fx of their own zone (the rule up to 3.0.1)  -  /unroll cityzoom default | <world zoom>"):format(CITY_IN)
+        out[#out + 1] = ("City maps show at %.2fx of their own zone (the per-zone rule)  -  /unroll cityzoom default | <world zoom>"):format(CITY_IN)
     end
 end
 

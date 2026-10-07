@@ -1,7 +1,7 @@
 local _, ns = ...
 
 --[[
-Boss and entrance markers on the dungeon view's FLOOR pages (2.11.0 prototype, wf16/synth; data: DungeonBossData.lua).
+Boss and entrance markers on the dungeon view's FLOOR pages (1.0.0; data: DungeonBossData.lua, made by tools/bosses/make_data.py).
 Blizzard blocks every position API inside instances, so the map shows WHERE the bosses and the entrance are instead:
 
   * a boss: Blizzard's raid-target skull (Interface\TargetingFrame\UI-RaidTargetingIcon_8, file 137008) on a dark disc
@@ -18,7 +18,7 @@ entrance cave / the entrance map the dungeon was opened from (Dungeon.lua decide
 list on hover (bosses without a position too), click = /unroll bosses.
 
 Art (verified in the LOCAL client 1.60.1.70124: UiTextureAtlasMember 897532 / UiTextureAtlas 897470 decoded, files present
-locally - wf16/synth/data/atlas_scan_all.json, path_check.json): WhiteCircle-RaidBlips (member 6220, atlas 867, file
+locally - the boss research's atlas_scan_all.json, path_check.json): WhiteCircle-RaidBlips (member 6220, atlas 867, file
 1523129), GarrMission_EncounterBar-PortraitRing (2474, atlas 152, file 952657), groupfinder-icon-greencheckmark (3373,
 atlas 236, file 985877); files 137008, 1502543, 1502548 present. NOT usable (file 1121272 Interface\Minimap\ObjectIconsAtlas
 is not installed): DungeonSkull, Dungeon, Raid, Map-MarkedDefeated, poi-door-*; nor the encounter journal's own
@@ -424,7 +424,7 @@ function B:ResetKills(dun)
     for i = 1, P.n do if P.items[i].m then Paint(P.items[i].m) end end
 end
 
--- (wf17 judge) INSTANCE_LOCK_START / INSTANCE_LOCK_WARNING (EncounterInfoDocumentation.lua:68 / :80): the game has the lock's
+-- (review) INSTANCE_LOCK_START / INSTANCE_LOCK_WARNING (EncounterInfoDocumentation.lua:68 / :80): the game has the lock's
 -- encounters now (Blizzard's lock dialog reads them then - GameDialogDefs.lua INSTANCE_LOCK) - read them again; this only
 -- ever adds kills.
 function B:OnLock(dun)

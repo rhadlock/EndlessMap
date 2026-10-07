@@ -161,7 +161,7 @@ local function WingsOf(id)
     return wingsOf[id]
 end
 
--- (2.11.0) The wing (index into WingsOf) a floor belongs to, 0 = none (DungeonBosses.lua counts per wing).
+-- (1.0.0) The wing (index into WingsOf) a floor belongs to, 0 = none (DungeonBosses.lua counts per wing).
 local function WingOfFloor(id, f)
     for i, w in ipairs(WingsOf(id) or {}) do
         for _, x in ipairs(w[3]) do if x == f then return i end end
@@ -197,7 +197,7 @@ local function PlayerFacing()
     if not GetPlayerFacing then return end
     local ok, f = pcall(GetPlayerFacing)
     if not ok or type(f) ~= "number" then return end
-    if issecretvalue and issecretvalue(f) then return end -- (wf13/review2: before any compare - not even f ~= f on a secret)
+    if issecretvalue and issecretvalue(f) then return end -- (review: before any compare - not even f ~= f on a secret)
     if f ~= f then return end
     return f
 end
@@ -257,7 +257,7 @@ end
 -- gives it there), 4) among the sub-zone's floors, the last one viewed.
 -- (Only inside the instance: auto-open and the player marker. Maps opened
 -- from the world map never guess from the player's whereabouts.)
--- 2.8.0: sz floors (DungeonMapsMM.lua) are never picked from the position alone;
+-- 1.0.0: sz floors (DungeonMapsMM.lua) are never picked from the position alone;
 -- maps with an ov floor (the whole map at a smaller scale: the Deeprun Tram's
 -- line, Half-Pint Tavern's Arathi copy) pick from the position only - another
 -- floor holding the player wins (2% inside its picture to enter, 1% past its
@@ -295,7 +295,7 @@ local function DetectFloor(id)
             if inst ~= id then return end
             return PickOv(dm, x, y, D.detected[id])
         end
-        -- (2.9.0: no position at all - inside Half-Pint Tavern the game gives none: the sub-zone name, below)
+        -- (1.0.0: no position at all - inside Half-Pint Tavern the game gives none: the sub-zone name, below)
     end
     local sub = Trim(GetSubZoneText and GetSubZoneText())
     local cands
@@ -501,7 +501,7 @@ local function LoadLayer(L, page)
         ns.Quads:Clear(L)
     end
     L.page = page
-    if ns.Where then ns.Where:OnLoad(L, page) end -- (2.9.0: a lit room of another page goes)
+    if ns.Where then ns.Where:OnLoad(L, page) end -- (1.0.0: a lit room of another page goes)
 end
 
 local function LayerLoaded(L)
@@ -928,7 +928,7 @@ local function SetHotLink(lk)
     end
 end
 
--- (2.11.0) Where a click on an entrance marker (DungeonBosses.lua) leads: this book's entrance cave whose portal leads
+-- (1.0.0) Where a click on an entrance marker (DungeonBosses.lua) leads: this book's entrance cave whose portal leads
 -- to the dungeon, else the entrance map the dungeon was opened from. dry: only the tooltip hint (nil = no click).
 local function EntranceGo(it, dry)
     local book = D.book
@@ -950,7 +950,7 @@ local function EntranceGo(it, dry)
     end
 end
 
--- (2.11.0) The boss / entrance marker under the cursor (DungeonBosses.lua): lit, its tooltip, the interact cursor -
+-- (1.0.0) The boss / entrance marker under the cursor (DungeonBosses.lua): lit, its tooltip, the interact cursor -
 -- as SetHotLink.
 local function SetHotBoss(it)
     if D.hotBoss == it then return end
@@ -970,7 +970,7 @@ local function SetHotBoss(it)
 end
 
 -- The icons of page (its portals: ns.DUNGEON_PORTALS[cave]) and its level
--- links (DungeonLinks.lua); none for floors. (2.11.0: a floor's boss and entrance markers, DungeonBosses.lua)
+-- links (DungeonLinks.lua); none for floors. (1.0.0: a floor's boss and entrance markers, DungeonBosses.lua)
 local function SetIcons(page)
     SetHotIcon(nil)
     SetHotLink(nil)
@@ -1145,7 +1145,7 @@ local function RefreshUp()
     D.lvl.link = lk or nil
     D.lvl:SetShown(D.lvl.link ~= nil)
     local left = (par and D.up) or (lk and D.lvl) or D.back
-    -- (2.11.0) the dungeon's boss list: a skull button with the count of numbered bosses, after the buttons
+    -- (1.0.0) the dungeon's boss list: a skull button with the count of numbered bosses, after the buttons
     local bb, page = D.bossBtn, CurrentPage()
     local dun = page and page.kind == "floor" and page.dun
     local showB = bb and dun and ns.Bosses and ns.Bosses:HasList(dun) and true or false
@@ -1167,7 +1167,7 @@ local function RefreshUp()
     if D.titleLeft ~= left then
         D.title:ClearAllPoints()
         D.title:SetPoint("LEFT", left, "RIGHT", 12, 0)
-        D.title:SetPoint("RIGHT", D.bar, "RIGHT", -(D.titleRight or 222), 0) -- (2.9.0: Whereabouts.lua's chip)
+        D.title:SetPoint("RIGHT", D.bar, "RIGHT", -(D.titleRight or 222), 0) -- (1.0.0: Whereabouts.lua's chip)
         D.titleLeft = left
     end
 end
@@ -1252,7 +1252,7 @@ local function BuildBar(dv)
     lvl:Hide()
     D.lvl = lvl
 
-    -- (2.11.0) the boss list (DungeonBosses.lua): hover = every boss of the dungeon, click = markers on / off
+    -- (1.0.0) the boss list (DungeonBosses.lua): hover = every boss of the dungeon, click = markers on / off
     local bb = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
     bb:SetSize(46, 22)
     bb:SetScript("OnEnter", function(self)
@@ -1314,7 +1314,7 @@ local function PollArrow()
         local f = page.kind == "floor" and not page.f.ov and DetectFloor(page.dun)
         if f and f ~= page.floor then
             -- (unless it is the ov floor - the whole map at a smaller scale never vetoes the arrow, as it never
-            -- fades a dot (review2) - or both show the same ground: lv, DungeonMapsMM.lua - City of Dalaran's
+            -- fades a dot (review) - or both show the same ground: lv, DungeonMapsMM.lua - City of Dalaran's
             -- city / Hillsbrad pages)
             local of = ns.DUNGEON_MAPS[page.dun].f[f]
             if not (of and (of.ov or (of.lv and of.lv == page.f.lv))) then return end
@@ -1324,7 +1324,7 @@ local function PollArrow()
     end
 end
 
--- (review2) An auto-opened map with an ov floor, other than the tram (its own
+-- (review) An auto-opened map with an ov floor, other than the tram (its own
 -- watcher, NiWatch): Half-Pint Tavern's ground carries one area everywhere, so
 -- no zone event fires between the camp and the land around it - the floor
 -- follows the position at the poll rate (FollowFloor: a floor picked by hand
@@ -1509,7 +1509,7 @@ local function OnUpdate(_, dt)
         PollFollow()
         PollArrow()
         if ns.Markers then ns.Markers:Poll(POLL) end
-        if ns.Where then ns.Where:Poll() end -- (2.9.0: the named room, the chip)
+        if ns.Where then ns.Where:Poll() end -- (1.0.0: the named room, the chip)
     end
     PlaceArrow()
     if ns.Where then ns.Where:Place(moved) end
@@ -1555,7 +1555,7 @@ local function OnMouseUp(_, button)
                 local mx, my = Cursor()
                 if ns.Links:At(mx, my, IconScale(), BAR_H) == p.link then Dungeon:FollowLink(p.link, mx, my) end
             end
-            -- (2.11.0: or on the same boss / entrance marker)
+            -- (1.0.0: or on the same boss / entrance marker)
             if p.boss and D.active and not D.fade then
                 local mx, my = Cursor()
                 if ns.Bosses:At(mx, my, IconScale(), BAR_H) == p.boss then Dungeon:BossClick(p.boss) end
@@ -1751,7 +1751,7 @@ function Dungeon:FollowLink(lk, mx, my)
     return false
 end
 
--- (2.11.0) A boss marker clicked: zoom in about it (as two wheel notches over it, at least 2x); an entrance marker:
+-- (1.0.0) A boss marker clicked: zoom in about it (as two wheel notches over it, at least 2x); an entrance marker:
 -- the entrance map (EntranceGo).
 function Dungeon:BossClick(it)
     if not (it and D.active) then return end
@@ -1769,7 +1769,7 @@ function Dungeon:BossClick(it)
     D.targetZ = ns.Clamp(math.max(D.targetZ * step * step, 2), 1, MAX_ZOOM)
 end
 
--- (2.11.0) /unroll bosses and the bar's skull button: the markers on / off; the page shown picks them again.
+-- (1.0.0) /unroll bosses and the bar's skull button: the markers on / off; the page shown picks them again.
 function Dungeon:ToggleBosses(on)
     if on == nil then on = (ns.db and ns.db.bosses == false) and true or false end
     if ns.db then ns.db.bosses = on end
@@ -1778,11 +1778,11 @@ function Dungeon:ToggleBosses(on)
     return on
 end
 
--- (2.11.0) BOSS_KILL (encounterID, name) / ENCOUNTER_END (encounterID, name, difficulty, size, success): defeated
+-- (1.0.0) BOSS_KILL (encounterID, name) / ENCOUNTER_END (encounterID, name, difficulty, size, success): defeated
 -- this session (DungeonBosses.lua greys the marker).
 function Dungeon:OnBossEvent(event, id, _, _, _, success)
     if not ns.Bosses then return end
-    -- (review2: a secret success decides nothing - BOSS_KILL still counts)
+    -- (review: a secret success decides nothing - BOSS_KILL still counts)
     local won = event == "ENCOUNTER_END" and type(success) == "number" and not (issecretvalue and issecretvalue(success)) and success == 1
     if event == "BOSS_KILL" or won then
         ns.Bosses:OnEncounter(id)
@@ -1863,7 +1863,7 @@ function Dungeon:OpenInstance(id, how)
     return self:Open(book, PageOfFloor(book, id, f or D.lastFloor[id] or 1), how or "instant")
 end
 
--- (2.9.0) Whether what the game says of the player's whereabouts allows floor page of the instance the player is in
+-- (1.0.0) Whether what the game says of the player's whereabouts allows floor page of the instance the player is in
 -- (DungeonMarkers.lua: the engine arrow on City of Dalaran's pages). PollArrow's rule: a floor the sub-zone names
 -- elsewhere vetoes, unless it is the ov floor or shows the same ground (lv); a sz floor needs the sub-zone to name it.
 function Dungeon:PlayerOnFloor(page)
@@ -1928,7 +1928,7 @@ local function IconUnderCursor()
     if it and it.portal then
         if ns.DUNGEON_MAPS[it.portal.m] then return it end
     elseif it and it.noClick then
-        return it -- (3.0.0 Doors.lua: a placeholder / a door without a map - a tooltip, no click)
+        return it -- (1.0.0 Doors.lua: a placeholder / a door without a map - a tooltip, no click)
     elseif it and it.entrance and ns.DUNGEON_ENTRANCES and ns.DUNGEON_ENTRANCES[it.entrance] then
         return it
     end
@@ -1942,7 +1942,7 @@ local function SetHot(it)
     D.hot = it
     if ns.Labels then ns.Labels:SetHot(it) end
     if D.hover then D.hover:SetShown(it ~= nil) end
-    -- (3.0.0) Doors.lua adds its lines (placeholders, unconfirmed / learned doors, "You are inside ...")
+    -- (1.0.0) Doors.lua adds its lines (placeholders, unconfirmed / learned doors, "You are inside ...")
     if it then ShowTip(ns.Doors and ns.Doors:Tip(it, EntranceTip) or EntranceTip(it)) else HideTip() end
 end
 
@@ -1974,9 +1974,9 @@ end
 function Dungeon:OnCanvasClick(button)
     if button ~= "LeftButton" then return false end
     local it = IconUnderCursor()
-    if not it or it.noClick then return false end -- (3.0.0: a placeholder / a door without a map opens nothing)
+    if not it or it.noClick then return false end -- (1.0.0: a placeholder / a door without a map opens nothing)
     SetHot(nil)
-    -- (3.0.0) the door of the instance the player is in (Doors.lua "you are inside"), switch HERE_OPENS_INSTANCE on (the
+    -- (1.0.0) the door of the instance the player is in (Doors.lua "you are inside"), switch HERE_OPENS_INSTANCE on (the
     -- default): that instance's own map, as inside (off: the door opens its fixed page, as every entrance icon)
     local inside = it.here and ns.Doors and ns.Doors.HERE_OPENS_INSTANCE and ns.Doors:InsideId()
     if inside and ns.DUNGEON_MAPS[inside] then return self:OpenInstance(inside, "fade") end
@@ -2058,7 +2058,7 @@ end
 -- ContentTrackingUtil.OpenMapToTrackable; Blizzard_FrameXMLUtil/Mainline/
 -- MapUtil.lua l.75: C_Map.GetBestMapForUnit, up its parents to the first map
 -- with art, else C_Map.GetFallbackWorldMapID). Any other map - the parents the
--- nav bar offers too - is the user's: back to the world, as 2.7.0 (review2).
+-- nav bar offers too - is the user's: back to the world, as before (review).
 local function OwnMapChange()
     local id = CurrentInstance()
     local dm = id and ns.DUNGEON_MAPS[id]
@@ -2100,7 +2100,7 @@ function Dungeon:OnZoneEvent(event)
     end
     if id and D.active then
         self:FollowFloor(id)
-        D.pollT = 0 -- (2.9.0: the lit room follows the sub-zone at once; wf13 judge: inside only - elsewhere 2.8.0's timing)
+        D.pollT = 0 -- (1.0.0: the lit room follows the sub-zone at once; review: inside only - elsewhere the older timing)
     end
 end
 
@@ -2215,14 +2215,14 @@ function Dungeon:Setup()
     icf:SetAllPoints(dv)
     D.iconFrame = icf
     if ns.Links then ns.Links:Setup(icf) end -- (level-link pins: on the icon frame, fading with it)
-    if ns.Bosses then ns.Bosses:Setup(icf, { wingOf = WingOfFloor }) end -- (2.11.0: boss / entrance markers, same frame)
+    if ns.Bosses then ns.Bosses:Setup(icf, { wingOf = WingOfFloor }) end -- (1.0.0: boss / entrance markers, same frame)
 
     BuildMarker(dv)
     if ns.Markers then ns.Markers:Setup(dv, VIEW_LEVEL + 4, BAR_H) end
     BuildBar(dv)
     D.tip = BuildTip()
     if ns.Where then
-        -- (2.9.0) the named room + the chip (Whereabouts.lua): what it may use of this file
+        -- (1.0.0) the named room + the chip (Whereabouts.lua): what it may use of this file
         ns.Where:Setup({
             D = D, page = CurrentPage, inside = CurrentInstance, pos = PlayerPos, facing = PlayerFacing,
             detect = DetectFloor, floorName = FloorName, dungeonName = DungeonName, viewXY = ViewXY, inArea = InArea,
@@ -2257,8 +2257,8 @@ function Dungeon:Setup()
     for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "NEW_WMO_CHUNK" }) do
         events:RegisterEvent(ev)
     end
-    -- (2.11.0) defeated bosses (DungeonBosses.lua); pcall: an event a client lacks is simply not registered
-    -- (wf17 judge) and the instance lock again when the game starts its lock dialog (the data of that dialog)
+    -- (1.0.0) defeated bosses (DungeonBosses.lua); pcall: an event a client lacks is simply not registered
+    -- (review) and the instance lock again when the game starts its lock dialog (the data of that dialog)
     for _, ev in ipairs({ "BOSS_KILL", "ENCOUNTER_END", "INSTANCE_LOCK_START", "INSTANCE_LOCK_WARNING" }) do pcall(events.RegisterEvent, events, ev) end
     events:SetScript("OnEvent", function(_, event, ...)
         if event == "BOSS_KILL" or event == "ENCOUNTER_END" then Dungeon:OnBossEvent(event, ...) return end

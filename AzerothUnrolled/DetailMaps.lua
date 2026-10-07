@@ -2,7 +2,7 @@ local _, ns = ...
 
 -- Detail levels drawn INTO the world map (Render.lua, like a capital's own map over its home zone).
 -- Blackrock Mountain: a mountain of five instances whose entrance level Blizzard drew at 4.1x Burning Steppes' texel
--- density (0.711 yd/px vs 2.923). Dalaran (2.10.0): WoW Forever's OPEN-WORLD city in Alterac Mountains (Eastern
+-- density (0.711 yd/px vs 2.923). Dalaran (1.0.0): WoW Forever's OPEN-WORLD city in Alterac Mountains (Eastern
 -- Kingdoms, map 0 - in game inside it C_Map.GetBestMapForUnit = 1416, UnitPosition = 172, 299, instance 0), drawn from
 -- the client's own Eastern Kingdoms MINIMAP tiles (0.96 px/yd: 2.68x Alterac's texel density; they show Forever's new
 -- walled city), cut to its barrier ring and gate plaza. Nothing here is a uiMap of this client: an entry is a VIRTUAL
@@ -18,12 +18,12 @@ local _, ns = ...
 --   home     = its zone's uiMap: its continent (the level shows over that continent), its banner cover's art; the level
 --              is drawn only where that zone's cell mask fits this client. The city switch (Render.lua) turns it on - as
 --              the capitals; with /unroll cityzoom off by this zone's own zoom; a cave (gate "cave") by the cave switch
---              (3.6.0: or the deepest zoom over it, where less)
+--              (1.2.0: or the deepest zoom over it, where less)
 --   entrance = ns.INSTANCES / ns.DUNGEON_ENTRANCES key: clicking the bare art opens that entrance map; its world icon
 --              gives way while the level shows (Labels.lua)
---   mask     = shape mask (256x256 32-bit RLE TGA, white + alpha, stretched over the whole picture: wf7/brm/mask.py -
+--   mask     = shape mask (256x256 32-bit RLE TGA, white + alpha, stretched over the whole picture: tools/brm_masks/mask.py -
 --              the dark rock of the drawn mountain; frame, title banner, corner art and printed labels left out;
---              wf14/build/tools/dalmask2.py - Dalaran's barrier ring, its causeway and gate plaza)
+--              tools/dal_mask/dalmask2.py - Dalaran's barrier ring, its causeway and gate plaza)
 --   nz       = picture-px box {x0, y0, x1, y1} outside which the mask is zero
 --   under    = a second level drawn UNDER it with its own mask (the halls of Blackrock Depths, lava lake left out), so
 --              the Blackrock Depths / Molten Core icons sit on drawn art
@@ -34,11 +34,11 @@ local _, ns = ...
 --              or several rects (rects = { {dst, src, feather, pieces = {piece, ...}}, ... }), each only while one of
 --              ITS pieces shows; explored = true: the source art is the home zone's explored pieces (what it shows),
 --              not all of them (so a partly explored zone gets a patch in its own shade)
---   icons    = the instances behind it, at the portals drawn in the art (wf6 portals_70009.json, cross-checked with Forever
+--   icons    = the instances behind it, at the portals drawn in the art (data/portals/portals_70009.json, cross-checked with Forever
 --              Map.db2 Corpse / AreaTrigger.db2 / portal M2 197007): world (wx north, wy west), m = instance map, f = floor
 --              a click opens, n = enUS name (lfg: LFGDungeons ID of a wing, localized by GetLFGDungeonInfo), kind
 --   hit      = click grid of the mask: 100 x 67 cells over the picture, per row the column ranges inside the shape
---              (alpha >= 0.5; wf9/tools/hitgrid.py); the under level has its own
+--              (alpha >= 0.5); the under level has its own
 ns.DETAIL_MAPS = {
   brm = {
     id = -229, cave = "brm_spire", home = 1428, inst = 0, entrance = "Blackrock Mountain",

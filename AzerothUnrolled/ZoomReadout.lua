@@ -1,13 +1,13 @@
 --[[
-Azeroth Unrolled - ZoomReadout.lua (3.0.1; 3.1.0: the world-zoom switch is the default, 14.05x)
+Azeroth Unrolled - ZoomReadout.lua (1.0.0; the world-zoom switch is the default, 14.05x)
 
 A tuning aid; nothing here draws map art.
   /unroll zoom        a small readout on the map: ONE global zoom number (1.00x = the whole world map fills the view),
                    the zone under the centre of the view, and every city / detail map in view with whether its map shows.
   /unroll cityzoom N  the WORLD zoom from which every city map (and Blackrock Mountain, Dalaran) shows, wherever the view
                    is; they hide again just below it (0.5%). /unroll cityzoom default = 14.05x; /unroll cityzoom off = the
-                   rule up to 3.0.1 (1.5x of the home zone of each city). Saved (AzerothUnrolledDB.cityZoom).
-  /unroll cavezoom N  (3.4.0) the WORLD zoom from which the caves show (Caves.lua); default = 30x (3.6.2; 3.6.0 52x), off =
+                   rule before 1.0.0 (1.5x of the home zone of each city). Saved (AzerothUnrolledDB.cityZoom).
+  /unroll cavezoom N  (1.2.0) the WORLD zoom from which the caves show (Caves.lua); default = 30x, off =
                    never. Over a cave the wheel stops short of it, the cave shows at the deepest zoom there. Saved
                    (AzerothUnrolledDB.caveZoom).
 ]]
@@ -44,7 +44,9 @@ local function Ensure()
     if not c then return false end
     frame = CreateFrame("Frame", nil, c)
     if ns.SetLevelFixed then ns.SetLevelFixed(frame, LEVEL) else frame:SetFrameLevel(LEVEL) end
-    frame:SetPoint("TOPLEFT", c, "TOPLEFT", 8, -8)
+    -- (1.3.0: right of Blizzard's map-pin button and the party bubbles under it (PartyBubbles.lua), below the dungeon
+    -- view's bar - at 8, -8 it lay over the pin button)
+    frame:SetPoint("TOPLEFT", c, "TOPLEFT", 40, -36)
     frame:SetSize(200, 40)
     frame:EnableMouse(false)
     bg = frame:CreateTexture(nil, "BACKGROUND")
@@ -64,7 +66,7 @@ local function Ensure()
 end
 
 function Z:Update()
-    if not (frame and frame:IsVisible()) then return end -- (3.1.1: only while the map shows)
+    if not (frame and frame:IsVisible()) then return end -- (1.0.0: only while the map shows)
     text:SetText(table.concat(Lines(), "\n"))
     local w, h = text:GetStringWidth(), text:GetStringHeight()
     if type(w) ~= "number" or type(h) ~= "number" then w, h = 190, 30 end
@@ -76,7 +78,7 @@ function Z:Apply()
     local db = ns.db
     if not db then return end
     if ns.Render and ns.Render.SetCityZoom then ns.Render:SetCityZoom(db.cityZoom) end
-    if ns.Render and ns.Render.SetCaveZoom then ns.Render:SetCaveZoom(db.caveZoom) end -- (3.4.0)
+    if ns.Render and ns.Render.SetCaveZoom then ns.Render:SetCaveZoom(db.caveZoom) end -- (1.2.0)
     if db.zoomReadout then
         if Ensure() then
             frame:Show()
@@ -87,7 +89,7 @@ function Z:Apply()
     end
 end
 
--- (3.5.0) /unroll cityzoom and /unroll cavezoom: a world zoom - kept within lo..hi of the switch (said so when it is not) -
+-- (1.2.0) /unroll cityzoom and /unroll cavezoom: a world zoom - kept within lo..hi of the switch (said so when it is not) -
 -- default (or on), off (or 0; offWords: more words for off); returns the new setting (false: off), nil: nothing to do.
 local function SwitchSetting(cmd, num, arg, lo, hi, default, Print, offWords)
     if num and num ~= 0 then
@@ -111,7 +113,7 @@ function Z:Slash(cmd, num, Print, arg)
         return
     end
     if cmd == "cavezoom" then
-        -- (3.4.0) the world zoom from which the caves show (Caves.lua)
+        -- (1.2.0) the world zoom from which the caves show (Caves.lua)
         local v = SwitchSetting(cmd, num, arg, R.CAVE_G_MIN, R.CAVE_G_MAX, R.CAVE_G, Print)
         if v ~= nil then
             db.caveZoom = v
@@ -126,7 +128,7 @@ function Z:Slash(cmd, num, Print, arg)
         return
     end
     if cmd == "cityzoom" then
-        -- (3.1.2) at most Render.CITY_G_MAX: from about 25.7x the view can lie inside a capital, whose own map then shows
+        -- (1.0.0) at most Render.CITY_G_MAX: from about 25.7x the view can lie inside a capital, whose own map then shows
         local v = SwitchSetting(cmd, num, arg, 1, R.CITY_G_MAX, R.CITY_G, Print, { zone = true })
         if v ~= nil then
             db.cityZoom = v
@@ -137,7 +139,7 @@ function Z:Slash(cmd, num, Print, arg)
             Print(("city maps show above world zoom %.2fx, wherever the view is (hide below %.2fx). /unroll cityzoom default = %.2fx, off = 1.5x of each city's own zone"):format(
                 g, g * zout / zin, R.CITY_G))
         else
-            Print(("city maps show at %.2fx of their own zone (the rule up to 3.0.1). /unroll cityzoom default = world zoom %.2fx"):format(zin, R.CITY_G))
+            Print(("city maps show at %.2fx of their own zone (the per-zone rule). /unroll cityzoom default = world zoom %.2fx"):format(zin, R.CITY_G))
         end
         return
     end

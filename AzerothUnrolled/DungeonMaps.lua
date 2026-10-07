@@ -16,7 +16,7 @@ local _, ns = ...
 --   s = { [enUS GetSubZoneText()] = floor | { floors, best first } } (trim the game string; floors sharing a name are ambiguous).
 --       On any locale, GetSubZoneText() == _G["DUNGEON_FLOOR_" .. g] also picks that floor.
 ns.DUNGEON_MAPS = {
-  -- (wf7/tram) Deeprun Tram. Map.db2[369] (Forever 1.60.1.70009): MapType 2, InstanceType 0 = NOT an instance (like
+  -- (1.0.0) Deeprun Tram. Map.db2[369] (Forever 1.60.1.70009): MapType 2, InstanceType 0 = NOT an instance (like
   --   Eastern Kingdoms), AreaTable 2257. ni = true: IsInInstance() is false there, so Dungeon.lua takes the map from
   --   GetInstanceInfo()'s 8th return alone - and only while the player stands on one of its pictures (the one picture
   --   is the Stormwind end of the line: 312 x 208 yd of a ~2600 yd tunnel; the Ironforge end has no Blizzard art).

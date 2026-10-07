@@ -1,7 +1,7 @@
 local _, ns = ...
 
 --[[
-"Where am I" inside instances (2.9.0 candidate, wf12/synth prototype).
+"Where am I" inside instances (1.0.0).
 
 Inside an instance the game gives addons no position: UnitPosition("player") returns nil, nil, nil, <instance id>
 (in game, The Hall of Thanes, 1.60.1.70058). So the dungeon view cannot draw the player's arrow there. What the game
@@ -12,7 +12,7 @@ still tells an addon:
   * the FACING: GetPlayerFacing() - if the game answers inside instances (in-game test; nil = no needle).
 
 What this module shows, only on a floor page of the instance the player is in, and only while the game gives no
-position (where it does - the open world, the Deeprun Tram - Dungeon.lua's own arrow is drawn, as 2.8.0):
+position (where it does - the open world, the Deeprun Tram - Dungeon.lua's own arrow is drawn, as before):
   * the named room on the picture: a warm gold fill with an outline, drawn on the picture layer itself (it zooms, pans
     and cross-fades with the page), and the text "You are in <name>" on it (unscaled, on the icon frame);
   * a chip on the bar: a needle turned to the facing (the pages are north-up) and the room / level; its tooltip says why
@@ -20,7 +20,7 @@ position (where it does - the open world, the Deeprun Tram - Dungeon.lua's own a
 Never a spot the game did not give: no dot and no arrow on the picture.
 
 Grid: ns.SUBZONE_GRID = { 111, 74 } square cells of the 1002 x 668 picture; region strings as SubZoneRegions.lua says.
-Outline: through the midpoints of the region's cell edges (wf13/review1): straight runs as thin textures, every corner
+Outline: through the midpoints of the region's cell edges (review): straight runs as thin textures, every corner
 cut at 45 degrees and 1-cell staircases as straight diagonals, both as Line objects (Frame:CreateLine); pieces lengthened
 by tan(22.5 deg) / 2 x their thickness, so the 135-degree joints close. Without CreateLine (or CHAMFER = false): the cell
 boundary's axis-aligned runs, horizontal ones lengthened and vertical ones shortened by half the thickness (no overlap).
@@ -43,7 +43,7 @@ local ARROW_ATLAS = "UI-WorldMapArrow"
 local ARROW_FILE = "Interface\\WorldMap\\WorldMapArrow"
 local FACING_EPS = 0.005
 local LABEL_PAD = 6
-local CHAMFER = true                   -- (wf13/review1) outline corners cut at 45 degrees (Lines); false = cell steps
+local CHAMFER = true                   -- (review) outline corners cut at 45 degrees (Lines); false = cell steps
 local CUT = 0.2071                     -- tan(22.5 deg) / 2: a piece's extension per unit of thickness at a 135-degree joint
 
 local P = {
@@ -311,7 +311,7 @@ end
 
 local function ClearLayer(L)
     if not L then return end
-    -- (wf13/review2: only the holder that shows something - Light and Thicken show pieces on L.hlHolder alone, and
+    -- (review: only the holder that shows something - Light and Thicken show pieces on L.hlHolder alone, and
     -- Off() runs at every poll outside instances: no walk over the pools when nothing is lit)
     if L.hlHolder then ClearHolder(L.hlHolder) end
     L.hlPage, L.hlStr, L.hlS, L.hlHolder, L.hlData = nil, nil, nil, nil, nil
@@ -396,7 +396,7 @@ local function Thicken(L)
         end
         HideFrom(h[name], n + 1)
     end
-    -- (wf13/review2: and the 45-degree Lines of a chamfered room lit before on this holder - a label-only name has no
+    -- (review: and the 45-degree Lines of a chamfered room lit before on this holder - a label-only name has no
     -- chamfer pieces and comes here)
     HideFrom(h.hlLineD, 1)
     HideFrom(h.hlGlowD, 1)
@@ -431,7 +431,7 @@ end
 -- The label on the picture and the chip on the bar
 ---------------------------------------------------------------------------
 local function BuildLabel(parent)
-    -- (wf13 judge) on the icon frame itself, OVERLAY sub-level 7 (SimpleRegionAPIDocumentation.lua SetDrawLayer): a child
+    -- (review) on the icon frame itself, OVERLAY sub-level 7 (SimpleRegionAPIDocumentation.lua SetDrawLayer): a child
     -- frame of its own got the default level, the icon frame's + 1 = the level of the group markers' frames
     -- (DungeonMarkers.lua: the engine arrow and the party dots on City of Dalaran / Half-Pint Tavern) - an undefined draw
     -- order with them. Within one frame the order is fixed: above the level-link pins (OVERLAY 3 / 4), below every marker.
@@ -502,7 +502,7 @@ local function ChipWidth(c, right)
     local ok, tw = pcall(fn, fs)
     if not ok or type(tw) ~= "number" or (issecretvalue and issecretvalue(tw)) or tw ~= tw then tw = 0 end
     local bw = P.api.D.bar and P.api.D.bar:GetWidth() or 0
-    -- (3.0.0 review) the bar's boss button (Dungeon.lua, 46 px + 6) sits left of the title: where the bar is short of room
+    -- (1.0.0 review) the bar's boss button (Dungeon.lua, 46 px + 6) sits left of the title: where the bar is short of room
     -- (the map's normal size) the chip's spare minimum width gives it up, so the dungeon's name keeps room (none changes
     -- where the bar has room, nor without the button)
     local bb = P.api.D.bossBtn
@@ -524,8 +524,8 @@ local function SetChip(show, text, title, dun, target, grey)
         end
         if grey then c.label:SetTextColor(0.7, 0.7, 0.7) else c.label:SetTextColor(1, 1, 1) end
     end
-    -- (the level picker: Blizzard's dropdown, 200 px at -8; else 2.8.0's prev / next fallback, 24 + 150 + 24 px and two
-    -- 6 px gaps at -8, its left edge 218 px from the bar's end - wf13/review2)
+    -- (the level picker: Blizzard's dropdown, 200 px at -8; else the older prev / next fallback, 24 + 150 + 24 px and two
+    -- 6 px gaps at -8, its left edge 218 px from the bar's end - review)
     local pick = (D.dd and D.dd:IsShown() and 214) or (D.next and D.next:IsShown() and 224) or nil
     local dd = pick ~= nil
     local right = show and (pick or 8) or nil
@@ -541,7 +541,7 @@ local function SetChip(show, text, title, dun, target, grey)
         c.w = cw
         c:SetWidth(cw)
     end
-    -- (the title's right edge: 14 px left of the chip; without a level picker 2.8.0's 222 px as long as the chip fits)
+    -- (the title's right edge: 14 px left of the chip; without a level picker the older 222 px as long as the chip fits)
     local tr = cw and (dd and (right + cw + 14) or ((right + cw + 14 > 222) and (right + cw + 14)) or nil) or nil
     if c:IsShown() ~= show then c:SetShown(show) end
     if D.titleRight ~= tr then
@@ -580,7 +580,7 @@ function W:Poll()
     local api = P.api
     if not api then return end
     local D = api.D
-    -- (wf13/review2: the view fades out - Dungeon:Exit - the light, label and chip fade with the art as they are)
+    -- (review: the view fades out - Dungeon:Exit - the light, label and chip fade with the art as they are)
     if not D.active and D.fade then return end
     local page = api.page()
     local id = page and page.kind == "floor" and D.active and api.inside()
@@ -614,7 +614,7 @@ function W:Poll()
         Light(D.front, page, s)
         P.state = "room"
         local d = Decode(s)
-        -- (wf13/review2: placed again only when the room, its page or its text changed - not at every poll)
+        -- (review: placed again only when the room, its page or its text changed - not at every poll)
         if P.lit ~= d or d.page ~= page or P.labelText ~= sub then P.lblDirty = true end
         P.lit = d
         d.page = page
@@ -666,7 +666,7 @@ function W:Place(moved)
                 -- (and pushed down from the bar / up from the bottom edge: a cell on the picture's top row put half the text
                 -- under the bar)
                 local hh = (fs:GetStringHeight() or 12) / 2 + 2
-                -- (2.11.0) not over a boss / entrance marker (DungeonBosses.lua): just under the marker it would cover
+                -- (1.0.0) not over a boss / entrance marker (DungeonBosses.lua): just under the marker it would cover
                 if ns.Bosses and ns.Bosses.Clear then py = ns.Bosses:Clear(px, py, half, hh) end
                 local top = (D.bar and D.bar:GetHeight() or 30) + hh
                 if H_ > top + hh then py = math.min(math.max(py, top), H_ - hh) end
@@ -696,7 +696,7 @@ end
 
 function W:State() return P.state, P.lit ~= nil end
 
--- (2.11.0) DungeonBosses.lua: markers came, went or grew - place the label again (next W:Place).
+-- (1.0.0) DungeonBosses.lua: markers came, went or grew - place the label again (next W:Place).
 function W:Relabel() P.lblDirty = true end
 
 function W:DebugText()

@@ -18,7 +18,7 @@ local _, ns = ...
 -- used here is Blizzard's own in this client: Blizzard_SharedXML/MixinUtil.lua l.68, Blizzard_SharedXMLBase/AnchorUtil.lua
 -- l.375), SetColorTexture l.403; SimpleFrameAPIDocumentation.lua
 -- SetClipsChildren l.1217, SetFixedFrameLevel l.1248 (Util.lua); SimpleRegionAPIDocumentation.lua IsObjectLoaded l.110,
--- SetVertexColor l.191, SetDrawLayer l.147. Every one that 2.7.0 did not use is checked before it is called.
+-- SetVertexColor l.191, SetDrawLayer l.147. Every one the first versions did not use is checked before it is called.
 -- (A file of its own, like DungeonLinks.lua: Dungeon.lua's chunk and functions stay far from Lua 5.1's limits.)
 local Q = {}
 ns.Quads = Q

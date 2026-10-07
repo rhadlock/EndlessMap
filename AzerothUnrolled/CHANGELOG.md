@@ -1,5 +1,32 @@
 # Changelog
 
+## Azeroth Unrolled 1.3.0 (2026-10-07) - minimap imagery, party bubbles, smooth flights
+
+- Fixed: zooming with the mouse wheel while the map follows you (or a party member) lost track of them - the map
+  zoomed about the middle of the view and slid away from them until it stopped; zoomed in from a whole continent, it
+  could throw you right off the map. Now the zoom goes about the one you follow, who stays in the middle of the map
+  all the way in and out (on the world and continent views as close to the middle as the map's edge allows, gliding
+  back onto it as you zoom in), a fast spin in from the whole world goes as deep as you spin (it stopped at about 5x),
+  and a capital city no longer pulls the view onto itself while you follow someone past it.
+- **Party bubbles**: you and your party (in a raid: your own group) as small round portraits in the map's top left
+  corner, under the map-pin button. Hover one to see the zone they are in; click it and the map flies to them - it
+  zooms out, glides across and zooms back in, one smooth arc - and follows them; click again to stop. A turn of the
+  wheel on the way changes how close it lands; another bubble on the way turns the flight to that one, at your zoom.
+  The bubble of the one followed glows; offline or dead members are greyed. `/unroll bubbles`, the map menu or the
+  Settings page switch them off and on. The zoom readout (`/unroll zoom`) moved to the right of the bubbles.
+- The map no longer jumps when the one you follow is suddenly far away - through a portal, a hearthstone, the end of a
+  long trip, even in the middle of a zoom: it flies after them the same way.
+- **Minimap imagery**: the whole world map drawn from the game's own minimap pictures - the real terrain, from the
+  whole world down to the deepest zoom - instead of the drawn map. Switch between the two with the new round button
+  left of the caves button (its picture shows the other look; it glows while the imagery is on), the map menu, the
+  Settings page or `/unroll imagery` (off by default). Land you have not explored is greyed as you zoom in on a
+  continent (the sea and the capitals stay in colour), and turns to colour the moment you explore it. Zone and city
+  names stay on the map, explored sub-zones get their names; Ironforge's and Undercity's city maps still show (they are underground), the caves,
+  Blackrock Mountain, Dalaran, dungeon entrances and every map icon too.
+- In combat the game allows no map change, so following keeps the view inside the map shown, as before; a turn of the
+  wheel now brings the one you follow back to the middle even past that map's edge, and Blizzard's own map and its
+  pins come back there when combat ends.
+
 ## Azeroth Unrolled 1.2.0 (2026-10-06) - caves, the Gnomeregan tunnels, M follows you
 
 - **Caves on the world map.** Zoom in past world zoom 30 and the caves of the old world show their tunnels right on
@@ -68,7 +95,8 @@
 
 ## Azeroth Unrolled 1.0.0 (2026-10-04) - new name, settings button
 
-Azeroth Unrolled is SmoothMapZoom 3.1.2 under its new name, plus a settings button on the map.
+The first release on CurseForge - the add-on was called SmoothMapZoom while it was being made - with a settings
+button on the map.
 
 - The folder is `AzerothUnrolled`, the saved settings `AzerothUnrolledDB`; the commands are `/unroll` and
   `/azerothunrolled`.
@@ -82,149 +110,3 @@ Azeroth Unrolled is SmoothMapZoom 3.1.2 under its new name, plus a settings butt
   `/unroll button`. `/unroll labels` still switches names and icons together.
 - Saved settings: three new keys - placeNames, dungeonIcons and mapButton (all on by default); nothing else changes.
 - Licence: GNU General Public License, version 3 or later (files `LICENSE` and `NOTICE.md`).
-
-Below: the history of SmoothMapZoom. Its commands were `/smz ...`; they are `/unroll ...` now.
-
-## 3.1.2 (2026-10-03) - no city map below the switch
-
-- **Below the city switch nothing of a city's own map shows, anywhere.** Orgrimmar's cell in the map mosaic reaches
-  past Durotar's map (its north half); there the city's own art stayed below the switch, at every zoom. Now the
-  continent's art shows there, as in the strip beside it between Azshara's and Durotar's maps; from 14.05x the city's
-  map covers it as before. (Every other capital lies inside its home zone's map.)
-- **Quest areas stay on top of the city maps.** 3.1.1 put the city maps above the zone highlight everywhere - and so
-  above the game's shaded quest and scenario areas as well, which only zone maps draw. Over a zone map the city maps
-  now lie just above its explored areas (still over the printed city names; this game draws no zone highlight there),
-  over a continent or the world map above the zone highlight.
-- `/smz cityzoom` takes at most 25x: from about 25.7x the view can lie inside a city, and a higher switch let the
-  city's own map show below it. The menu presets were never affected.
-- After a very fast zoom-out from inside a city, its picture no longer comes back faintly for a few frames.
-
-## 3.1.1 (2026-10-03) - city maps over the game's own map art
-
-- **City maps are drawn over the game's own map art.** Above the city switch the six capitals, Blackrock Mountain
-  and Dalaran lie over everything the game draws for the map itself: a zone's explored areas with their printed
-  city names (Dun Morogh's IRONFORGE banner, Alterac's DALARAN) and a continent's zone highlight no longer cover
-  them, wherever the view is. Only the map icons (the game's, the add-on's, other add-ons' pins) and the place names
-  stay on top. (In the game a frame that clips its contents draws them as one block: the city maps now have a
-  block of their own, right above the map art.)
-- **No blurry blocks deep in a continent map.** Where the map under the add-on's is still the continent (Orgrimmar's
-  north half lies outside Durotar's map), the continent's zone highlight was magnified into big blurry blocks; past
-  2.5x of the continent's own view it is hidden now.
-- **Fixed: a Lua error at login** ("Division by zero" in Render.lua) with the zoom readout on: the readout updates
-  only while the map shows, and never divides by a map of size 0.
-
-## 3.1.0 (2026-10-02) - one zoom level for all city maps
-
-- **One switch for every city map.** From world zoom 14.05x (read it with `/smz zoom`) all six capitals, Blackrock
-  Mountain and Dalaran show their own map; below it (they hide again just under the line, at 13.98x) the map is
-  Blizzard's drawing of the zone with its printed city banner. Only the zoom decides - not where the view or the
-  cursor is, and not which zone is under the centre. `/smz cityzoom <N>` sets another zoom, `/smz cityzoom default`
-  is 14.05, `/smz cityzoom off` brings back the rule up to 3.0.1 (1.5x of each city's own zone). What 3.0.1 saved
-  for this setting is replaced by the default once.
-- **Below the switch the city spot is always the zone's own drawing.** The zone cells and explored pieces no longer
-  paint the banner over, and a capital's cell shows its zone's art instead of the city's map (before, which of the
-  two you saw depended on which zone was under the centre of the view).
-- **Above the switch the city is always on top.** A neighbouring zone's picture can no longer lie across a city
-  (Wetlands over Ironforge, Desolace over Thunder Bluff, Silverpine over Undercity, Azshara over Orgrimmar).
-- **No pop at a city's edge.** A picture no longer drops under Blizzard's explored areas in one frame while it still
-  shows; the city's own rectangle (with its frame) comes only once the whole view lies inside the city's map, and
-  never rests half-faded with its edge on screen; fast wheel spins fade the city in a little more gently.
-- **No pop-in while scrolling.** A city within one view of the screen is built and loaded ahead, so a drag or a
-  fling brings it into view complete.
-- **Fewer pin reloads.** Zooming out of a zone, a glide across a zone's corner, a fast drag across a city or a wheel
-  spin into a city no longer switch Blizzard's map to a map that is left again a moment later.
-- **Names.** A capital's name label gives way while the zone's printed banner shows the name (never twice), and comes
-  back with the city's map. Labels that trade places with a city's name, or with Blackrock Mountain's and Dalaran's
-  icons, crossfade instead of popping. All five Blackrock Mountain instance icons show as soon as the mountain does.
-
-## 3.0.1 (2026-10-02) - zoom readout
-
-- `/smz zoom`: a small readout on the map: one global zoom number (1.00x = the whole world map), the zone under
-  the view's centre, and each city / detail map in view with whether its own map shows.
-- `/smz cityzoom <N>`: the WORLD zoom from which every city map shows (they hide again 10% lower); `off` = the
-  shipped rule (1.5x of each city's own zone). A tuning aid: the default behaviour is exactly 3.0.0's.
-
-## 3.0.0 (2026-09-30) - the release
-
-**Bosses and entrances on every dungeon map** (from the 2.11.0 prototype)
-- Boss markers on 31 instance maps: 269 encounters from Forever's own encounter table, 252 with a
-  position (165 high, 82 medium, 5 approximate). Numbers follow the game's encounter order per wing;
-  optional bosses carry no number; approximate ones are drawn fainter with "Approximate location".
-- Defeated bosses turn grey with a check (BOSS_KILL, ENCOUNTER_END, the instance lock the game reports on
-  entering); remembered until the next loading screen.
-- Entrance markers (44 on 31 maps): where you arrive; a click goes to the entrance map where there is one.
-- The bar's skull button lists every boss of the dungeon and turns the markers on / off; `/smz bosses`.
-- Click a boss marker to zoom in on it. The lit room's name moves clear of the markers.
-
-**Doors on the world map**
-- New door icon: Excavation Site: Wetlands (Wetlands 47.9, 56.5).
-- City of Dalaran's dungeon door: an icon at the portal at the end of the sewer pipe (Alterac 9.2, 60.2),
-  whose tooltip says it is not confirmed yet. It opens the City of Dalaran dungeon map; the open-world
-  Dalaran city picture is untouched.
-- Placeholders for the 8 instances not in the game files yet (The Drowned City, Krol'dok Stronghold,
-  Alcaz Prison, Blackmaw Hold, Shaper's Terrace, Manor Mistmantle, Hyjal Summit, Barrow Deeps): hollow
-  grey icons, no click, a tooltip with what is known. `/smz doors hints [on|off]`.
-- Learned doors: the addon learns an instance's door when you walk in (and out), saved account-wide;
-  it confirms placeholders and the unconfirmed Dalaran door, and adds icons for instances without one.
-  `/smz doors`, `/smz doors forget [id]`.
-- "You are inside": inside an instance its door on the world map carries your player icon, pulsing, at
-  every zoom; its tooltip starts with "You are inside <name>"; a click opens the map of the instance you
-  are in, also behind a shared door (Blackrock Mountain, Scarlet Monastery, Maraudon, Dire Maul).
-
-**Fixes**
-- Blackrock Mountain's picture, the capitals' city patches and the home zones' banner covers no longer
-  vanish after an exploration update while the map is at rest (they stayed invisible until the next
-  input).
-
-**Other**
-- README.md and this changelog in the addon folder.
-- No live minimap panel (not asked for); nothing else changed.
-
-## 2.11.0 (prototype, not released on its own)
-- Boss and entrance markers on the dungeon maps (see 3.0.0).
-
-## 2.10.0 (2026-09-30)
-- The Hall of Thanes: a door icon in Ironforge (28.3, 47.7, confirmed in game) that opens its map.
-- Dalaran is the open-world city of Alterac Mountains in Forever: it is drawn into the world map from the
-  client's own minimap art (cut to its barrier ring and gate plaza), with its name as a label.
-
-## 2.9.0 (2026-09-30)
-- "Where am I" inside instances: the room the game names is lit and labelled on the floor shown, the
-  floor is picked by sub-zone, and a chip on the bar names the room ("Room not named" otherwise).
-- The engine's own unit frame on the City of Dalaran and Half-Pint Tavern pages.
-
-## 2.8.0 (2026-09-29)
-- Blackrock Mountain: stairs pins between its levels, a level button on the bar, clicks go through to
-  the level under the cursor.
-- The Deeprun Tram with 3 floors (Stormwind station, the whole line, the Ironforge station).
-- Maps for Forever's own instances built from their minimap tiles (Ruins of Lordaeron, Excavation Site,
-  Half-Pint Tavern, City of Dalaran, The Hall of Thanes); the Ruins of Lordaeron portal as a door icon.
-
-## 2.7.0
-- The Deeprun Tram map; Blackrock Mountain as a city-like detail level with clickable instance icons.
-- The player and party on entrance maps drawn by the game's own widget; `/smz markers`.
-
-## 2.6.0
-- Dungeon maps open by clicking the dungeon icons; entrance maps with an icon per dungeon for shared
-  doors (Blackrock Mountain, Scarlet Monastery, Maraudon).
-- A heading player arrow on the dungeon maps.
-
-## 2.5.0
-- Dungeon maps: Blizzard's dungeon art that ships in the Forever client, drawn by file ID, with floors
-  and a floor dropdown; they open by themselves inside dungeons.
-
-## 2.4.0
-- Capital cities show their own map as soon as it is the sharper art; deep zoom stays inside maps that
-  have the detail for it; wheel zooms into a city end where the cursor points.
-
-## 2.3.0
-- Map icons move with the map (`/smz livepins`).
-- Capital cities (Ironforge) layered correctly; zone land from the game's own zone-shape masks instead of
-  magnified continent art (`/smz cells`).
-
-## 2.2.1
-- At rest the addon's art lives inside Blizzard's map canvas, below every pin (Questie and quest icons
-  stay clickable); review fixes.
-
-## 2.1.1
-- Crash fix for WoW Forever 1.60.1: no frame buffers (the client asserted on them); fades without them.
