@@ -1,7 +1,10 @@
-# Azeroth Unrolled
+# Endless Map
 
-Version 1.3.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.3.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
+
+Formerly **Azeroth Unrolled** - the same add-on under a new name. Its folder is still `AzerothUnrolled`, so an
+update keeps your settings, and the old commands keep working.
 
 One continuous zoom over the whole world map: scroll from Azeroth straight down to a
 dungeon entrance, drag across zone borders, and see the important places along the way. Questie-friendly.
@@ -36,6 +39,12 @@ dungeon entrance, drag across zone borders, and see the important places along t
 - *Forever:* Blackrock Mountain is drawn as a detail level of Burning Steppes, with an icon for each
   instance inside. Dalaran - the open-world city in Alterac Mountains - is drawn from the client's own
   minimap art.
+- *Forever:* Gilneas, the land south of Silverpine Forest and the Greymane Wall, is in the game but has no map of its
+  own: the add-on draws it, in the style of the maps beside it - its coast, ranges, roads, Gilneas City and its
+  houses, from the game's own terrain - with its names (Gilneas, Gilneas City). It shows wherever zone maps show, and
+  you can zoom in on it as on any zone. Gilneas follows the fog of war like every zone - parchment until you have been
+  there: each part (the countryside - most of the land, all at once -, Gilneas City, the Greymane Wall, the islands)
+  turns to colour once you have walked into it, remembered for each character.
 
 **Dungeon and raid maps** (*Forever*)
 - Click a dungeon or raid icon on the world map to open its map (Blizzard's map art that ships in the
@@ -86,7 +95,7 @@ dungeon entrance, drag across zone borders, and see the important places along t
 A small round button in the map's lower right corner (the treasure-map icon) opens the settings: tick what you want
 to see, pick the zoom behaviour under "Zoom". Left of it, the caves button (a mining pick) hides and shows the caves
 with one click; left of that (*Forever*) the imagery button switches between the drawn map and the minimap imagery - its
-picture shows the other look, and it glows while the imagery is on. The same settings are on the game's own page Esc > Options > AddOns > Azeroth Unrolled (plus "Buttons
+picture shows the other look, and it glows while the imagery is on. The same settings are on the game's own page Esc > Options > AddOns > Endless Map (plus "Buttons
 on the map", to bring hidden buttons back), and every one of them has a slash command.
 
 | Menu item | What it does |
@@ -118,7 +127,8 @@ shows it as "Custom".
 
 ## Slash commands
 
-`/unroll` (or `/azerothunrolled`) shows the settings and this list.
+`/endlessmap` shows the settings and this list. Every command works as `/endlessmap <command>` (that one always
+works) or with the short form `/unroll`, as written below; the old `/azerothunrolled` works too.
 
 | Command | What it does |
 |---|---|
@@ -206,7 +216,8 @@ Sources, with thanks:
 ## After a client patch: checking and refreshing the data
 
 The data was read from client builds 1.60.1.70009 to 70235 (each data file's header names its build) and checked in
-game on 1.60.1.70245. After a patch:
+game on 1.60.1.70245; the minimap imagery's pictures and sea masks were rebuilt from the minimap tiles of 1.60.1.70450
+(1.3.1). After a patch:
 1. **Check that it loads**: open the map, `/unroll debug`. A Lua error names the file.
 2. **New instances** (a placeholder whose map is now in the game): their `Map.db2` rows were encrypted
    in 70124. When a patch unlocks them, the instance can get a map page (built from its minimap art
@@ -234,6 +245,9 @@ against Blizzard's map code) are kept outside the addon folder.
 This release was built and checked in the offline harness of the earlier versions, which runs the addon's real
 files against Blizzard's own map canvas code (Lua 5.1 limits enforced; the 96 test runs of 1.3.0 - party bubbles, the flights and
 the minimap imagery among them - plus suites for the settings, caves and imagery buttons, the menu and the Settings page; image dumps).
+1.3.1 brings the new name and one fix: two copies of the add-on enabled at once (for example the CurseForge copy and a
+test copy) no longer fight over the map - only one runs. The same test results as 1.3.0, plus checks of the new name
+and of `/endlessmap`, and 7 new test runs of two copies at once and of a brand-new character.
 Things only the game can confirm
 (please report): the boss-marker art and the kill events in Forever, the placeholder spots, the City of
 Dalaran door (stand at the portal at the end of the sewer pipe: `/run print(UnitPosition("player"))`
@@ -242,7 +256,7 @@ should print about 377, 525), and that the door recorder learns a door when you 
 ## License / author
 
 Copyright (C) 2026 Hadlock.
-Azeroth Unrolled is free software under the GNU General Public License, version 3 or (at your option) any later version
+Endless Map is free software under the GNU General Public License, version 3 or (at your option) any later version
 (SPDX: `GPL-3.0-or-later`); it comes WITHOUT ANY WARRANTY. The full text is in `LICENSE`; data sources and
 third-party notices are in `NOTICE.md`.
 

@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - MapMenu.lua (1.0.0; 1.2.0: the caves button; 1.3.0: the imagery button)
+Endless Map - MapMenu.lua (1.0.0; 1.2.0: the caves button; 1.3.0: the imagery button)
 
 The round settings button in the lower right corner of the world map, and its menu; (1.2.0) left of it the caves button,
 which turns the caves on and off; (1.3.0) left of that the imagery button, which switches between the drawn map and
@@ -36,11 +36,12 @@ the minimap imagery (MinimapLayer.lua).
 /unroll button shows / hides the buttons (Options.lua: mapButton).
 ]]
 local ADDON, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local M = {}
 ns.MapMenu = M
 
-local TITLE = ns.TITLE or "Azeroth Unrolled" -- (Options.lua)
+local TITLE = ns.TITLE or "Endless Map" -- (Options.lua)
 local SIZE = 32
 local BESIDE_X, CORNER_X, BOTTOM_Y = -36, -3, 1 -- BOTTOMRIGHT offsets: left of the quest-log arrow / in the corner
 local CAVES_X = -2 -- (1.2.0) the caves button's right edge from the settings button's left: the gap left of the arrow

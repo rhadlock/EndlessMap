@@ -1,7 +1,7 @@
 --[[
-Azeroth Unrolled - OptionsPanel.lua (1.0.0)
+Endless Map - OptionsPanel.lua (1.0.0)
 
-The same settings as the map menu, on the game's own Settings page: Esc > Options > AddOns > Azeroth Unrolled. It is the
+The same settings as the map menu, on the game's own Settings page: Esc > Options > AddOns > Endless Map. It is the
 place players look for an addon's options, and the way back for those who hid the map button.
 
 Built from the list in Options.lua with Blizzard's settings API (Blizzard_Settings_Shared/Blizzard_Settings.lua:
@@ -13,11 +13,12 @@ opens the Settings panel itself and touches no Blizzard frame. Any piece of the 
 changes (the map button and the slash commands do not depend on this file).
 ]]
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local P = {}
 ns.OptionsPanel = P
 
-local TITLE = ns.TITLE or "Azeroth Unrolled" -- (Options.lua)
+local TITLE = ns.TITLE or "Endless Map" -- (Options.lua)
 local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton" } -- (1.3.0: + bubbles, imagery)
 local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "openZoom" }
 local NONE = 0 -- (a dropdown value must be a number: stands for cityZoom = false)

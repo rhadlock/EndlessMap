@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - ZoomReadout.lua (1.0.0; the world-zoom switch is the default, 14.05x)
+Endless Map - ZoomReadout.lua (1.0.0; the world-zoom switch is the default, 14.05x)
 
 A tuning aid; nothing here draws map art.
   /unroll zoom        a small readout on the map: ONE global zoom number (1.00x = the whole world map fills the view),
@@ -12,6 +12,7 @@ A tuning aid; nothing here draws map art.
                    (AzerothUnrolledDB.caveZoom).
 ]]
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local Z = {}
 ns.ZoomReadout = Z

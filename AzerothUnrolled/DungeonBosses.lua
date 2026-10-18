@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 Boss and entrance markers on the dungeon view's FLOOR pages (1.0.0; data: DungeonBossData.lua, made by tools/bosses/make_data.py).

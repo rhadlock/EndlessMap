@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 Doors (1.0.0, WoW Forever only): the world-map side of the instances.
@@ -94,7 +95,7 @@ end
 local function Plain(v) return v ~= nil and not (issecretvalue and issecretvalue(v)) end
 
 local function Print(msg)
-    if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffAzeroth Unrolled|r: " .. msg) end
+    if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffEndless Map|r: " .. msg) end
 end
 
 local function Now()

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 -- Minimap pages (DungeonMapsMM.lua): pictures put together from the client's
 -- own minimap textures instead of Blizzard's 12 map tiles, on a picture layer

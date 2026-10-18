@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 Render: our own copy of the world map art, placed at true positions on the
@@ -157,6 +158,13 @@ Ironforge, Undercity) without their home zones' banner covers, and the detail
 levels without their parchment covers (BuildCityLod, BuildDetailLod); its
 backdrop loaded is the frame's readiness (FindCovers) and no banner is printed
 (BannerShown).
+Gilneas (1.3.1, Gilneas.lua): the land south of Silverpine Forest that the client
+has but draws no map of. Render:Draw hands it the frame (after the levels are
+planned; not while the imagery shows); it lays its own page on the city layer's
+own level - over every part placed here, under every part lifted into the city
+layer - faded in with the cells (LOD_C0 / LOD_C1, exported below), loaded ahead
+as they are. Detached (1.3.1 review) a copy of it lies at a level of its own in
+the overlay, under the city and detail maps (PicTops: Render.pageLevel).
 ]]
 
 local Render = {}
@@ -216,6 +224,7 @@ local TILE = 256
 local LV_WORLD, LV_CONT, LV_FOOT = 0, 1, 2
 
 Render.FADE_Z0, Render.FADE_Z1 = BASE_Z0, BASE_Z1 -- (kept for other modules)
+Render.LOD_C0, Render.LOD_C1, Render.LOD_PREFETCH = LOD_C0, LOD_C1, LOD_PREFETCH -- (1.3.1: Gilneas.lua fades in with the cells)
 -- (1.0.0) The default world zoom of the city switch (measured in game by the user with /unroll zoom) and how far below it
 -- the maps hide again: just enough that a view resting on the line cannot blink (a settle moves the zoom by 4e-8). Every
 -- zone's own default view (Elwynn 12.88x, Hillsbrad 13.97x) lies below the band, so what shows there never depends on
@@ -2191,7 +2200,12 @@ end
 
 local function PicTops(lvPics)
     local lv = lvPics
+    -- (1.3.1 review) Gilneas's page (Gilneas.lua), detached while in view: a level of its own just under the first
+    -- city or detail map's - where the lift starts at rest - so they lie over it moving as at rest (a cave in its north)
+    local gil = not liftID and ns.Gilneas ~= nil and ns.Gilneas:Wants()
+    Render.pageLevel, Render.pageDetached = nil, not liftID
     for k, it in ipairs(pics) do
+        if gil and not Render.pageLevel and it.lodRole == "city" then Render.pageLevel, lv = lv, lv + 1 end
         lv = SlotLevels(it, lv)
         -- (how much of the zone's own regular pieces shows under its
         -- picture: not what older pictures cover)
@@ -2201,6 +2215,7 @@ local function PicTops(lvPics)
         end
         it.topA = TopAlpha(it.topB, w)
     end
+    if gil then Render.pageLevel = math.min(Render.pageLevel or lv, levelCap) end
 end
 
 -- At rest (see Render:SetRestLift): the pictures stacked above the real
@@ -2306,6 +2321,9 @@ function Render:Draw(cam, v)
     local lvPics = PlanCores(n, lvPieces + pieceMax + 1)
     PicTops(lvPics)
     LiftPictures()
+    -- (1.3.1) Gilneas's page (Gilneas.lua): on the city layer, faded in with the cells; not while the imagery shows;
+    -- (1.3.1 review) after the levels are planned - detached it takes the one PicTops kept for it
+    if ns.Gilneas and ns.Gilneas:Draw(cam, v, dppx, dppy, dMM, pfvw, pfx0, pfy0, pfx1, pfy1) then dbusy = true end
 
     wipe(used)
     for i = 1, n do

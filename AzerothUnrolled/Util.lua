@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 ---------------------------------------------------------------------------
 -- Math
@@ -268,10 +269,17 @@ end
 
 -- The most detailed map at world-map point (x, y): the smallest rect of ns.drawList holding it, else the world map.
 -- The wheel's depth limit counts from it (Core.lua), and so does a cave's switch where that limit is shallower (Render.lua).
-function ns.DeepestMapAt(x, y)
+-- (1.3.1) ns.extraZones: zones the add-on draws itself where Blizzard ships no map (Gilneas.lua) - entries with a zone
+-- map's rect and art size, virtual (a negative id: never a uiMap); realOnly leaves them out (a caller that asks C_Map).
+function ns.DeepestMapAt(x, y, realOnly)
     local best
     for _, e in ipairs(drawList) do
         if ns.RectContains(e, x, y) and (not best or e.area < best.area) then best = e end
+    end
+    if not realOnly and ns.extraZones then
+        for _, e in ipairs(ns.extraZones) do
+            if ns.RectContains(e, x, y) and (not best or e.area < best.area) then best = e end
+        end
     end
     return best or ns.maps[ns.WORLD_MAP_ID]
 end

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 -- Detail levels drawn INTO the world map (Render.lua, like a capital's own map over its home zone).
 -- Blackrock Mountain: a mountain of five instances whose entrance level Blizzard drew at 4.1x Burning Steppes' texel

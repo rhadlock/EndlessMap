@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 -- Capital cities (uiMapIDs). Their parent is the continent and their map type
 -- is Zone, so they can't be detected from map data - hence the list.

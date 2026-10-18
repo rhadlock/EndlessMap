@@ -12,6 +12,7 @@
 -- the emblems printed there carved out), the whole patch for their copies (ns.CityPatchCovers), and the patch's
 -- nonzero box.
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 ns.ZoneMasks = {
     [1411] = { file = "Interface\\AddOns\\AzerothUnrolled\\Masks\\1411.tga", cont = 1414, kind = "zone", art = 2169, rc = { 0.517098, 0.660781, 0.448028, 0.591711 }, nz = { 207.4, 26.1, 970.7, 639.3 } }, -- Durotar
     [1412] = { file = "Interface\\AddOns\\AzerothUnrolled\\Masks\\1412.tga", cont = 1414, kind = "zone", art = 1200, rc = { 0.3964, 0.563633, 0.510868, 0.678074 }, nz = { 31.3, 39.1, 669.3, 644.5 } }, -- Mulgore

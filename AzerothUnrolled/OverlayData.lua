@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 -- Every explored-area piece of every zone map (not just the ones you have
 -- explored), generated from the game tables WorldMapOverlay +

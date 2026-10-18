@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 HighlightGuard (1.0.0): Blizzard's zone hover highlight on a CONTINENT map

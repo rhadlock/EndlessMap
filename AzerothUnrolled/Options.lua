@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - Options.lua (1.0.0)
+Endless Map - Options.lua (1.0.0)
 
 Every setting of the addon in ONE place: what it is called, which values it takes and what has to happen after a change.
 Whatever changes a setting goes through here - the slash commands (Core.lua hands them over: Options:Slash), the map
@@ -22,10 +22,11 @@ before 1.0.0). placeNames and dungeonIcons are its two halves; choosing one of t
 leaves the other half as it was on screen.
 ]]
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local O = {}
 ns.Options = O
-ns.TITLE = "Azeroth Unrolled" -- (the name on the menu, the hover text and the Settings page)
+ns.TITLE = "Endless Map" -- (the name on the menu, the hover text and the Settings page; 1.3.1: the new name)
 
 local SPEC, LIST, BYCMD = {}, {}, {}
 

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 Labels: "important places along the way". Every label lives in world-map
@@ -156,6 +157,7 @@ function Labels:Build()
 
     for _, d in ipairs(ns.INSTANCES) do AddRow(d) end
     Labels:BuildDetailIcons()
+    if ns.Gilneas then ns.Gilneas:AddLabels(Add) end -- (1.3.1: Gilneas's names - Gilneas.lua: no uiMap there)
 end
 
 -- (1.3.0, MinimapLayer.lua) The sub-zone names (MinimapData.lua MINIMAP_SUBZONES: at their explored-area pieces), added
@@ -185,6 +187,7 @@ end
 
 -- Is one of a sub-zone label's explored-area pieces explored?
 local function SubzoneExplored(it)
+    if it.areaID then return ns.Gilneas ~= nil and ns.Gilneas:Explored(it.areaID) end -- (1.3.1: the fog of war, Gilneas.lua)
     local MM, P = ns.MinimapLayer, it.pieces
     if not (MM and P) then return false end
     for k = 1, #P - 3, 4 do
@@ -450,8 +453,10 @@ function Labels:Draw(cam, v)
             and (it.kind ~= "flight" or ns.db.flightPaths)
             and ns.db[it.style.icon and "dungeonIcons" or "placeNames"] ~= false -- (Azeroth Unrolled 1.0.0: the two halves of the layer)
             and not it.off and not (it.ghost and ns.db.doorHints == false) then -- (1.0.0: retired / placeholders off)
-            a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm)
-            if it.pieces and a > 0 and not SubzoneExplored(it) then a = 0 end -- (1.3.0: a sub-zone's name)
+            -- (1.3.1: Gilneas's names - it.homemade - in the imagery's bands everywhere: its page prints no names either)
+            a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm or it.homemade == true)
+            -- (1.3.0: a sub-zone's name; 1.3.1: the fog of war - Gilneas's, it.areaID)
+            if (it.pieces or it.areaID) and a > 0 and not SubzoneExplored(it) then a = 0 end
             it.soft = nil
             if it.detail or it.hideFor then
                 a = DetailFade(it, a)

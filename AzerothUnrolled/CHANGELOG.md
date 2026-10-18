@@ -1,5 +1,36 @@
 # Changelog
 
+## Endless Map 1.3.1 (2026-10-18) - the new name
+
+- **Azeroth Unrolled is now called Endless Map.** It is the same add-on: the map, the settings, the buttons and every
+  command work as in 1.3.0.
+- **Gilneas is on the map** (WoW Forever). The land south of Silverpine Forest and the Greymane Wall is in the game,
+  but the game has no map of it, so the map showed only the blurry continent picture there. Now it is drawn like the
+  maps beside it - coast, mountains, roads, Gilneas City and its houses, all from the game's own terrain - and named:
+  "Gilneas" from the continent view in, "Gilneas City" as you zoom in. It shows wherever zone maps show (not under the
+  minimap imagery, which has the terrain anyway; the names stay), and you can zoom in on it as on any zone - before,
+  the zoom stopped far out over it. A party member there shows as in Gilneas.
+- **Gilneas follows the fog of war like every zone**: parchment until you have been there. Each part of it - the
+  countryside (most of the land, all at once), Gilneas City, the Greymane Wall, the islands off the coast - turns to
+  colour once you have walked into it, right away even with the map open, and stays so for that character (another
+  character sees its own). Gilneas City's name shows once you have been there. With the minimap imagery on,
+  Gilneas's land is greyed until explored, as everywhere; with "unexplored land drawn in map style" off
+  (`/unroll mosaic`), unexplored Gilneas is left out like every zone's unexplored land.
+- Your settings are kept: the add-on's folder is still `AzerothUnrolled`, and the game keeps the saved settings by
+  that folder, so an update over 1.3.0 (or any earlier version) starts with everything as you left it.
+- The name shows in the AddOns list, on the Settings page (Esc > Options > AddOns > Endless Map), on the map menu and
+  in the chat.
+- New command: `/endlessmap` - the full one, it always works. `/unroll` stays the short form and `/azerothunrolled`
+  still works.
+- Fixed: two copies of the add-on enabled at once - for example the CurseForge copy and a test copy - no longer fight
+  over the map: only one runs. (A new character starts with every add-on enabled; with two copies on, zooming was
+  jittery.) While the test copy, Endless Map (beta), is enabled, it is the one that runs; the other copy does
+  nothing and says nothing. A copy older than 1.3.1 cannot step aside, so next to one the newer copy does - and
+  leaves the older copy's settings as they are.
+- Minimap imagery: the lakes and rivers match the game's again. The game's latest patch drew the minimap's water
+  darker; the imagery's pictures are now made from the new minimap, so lakes, rivers and coasts no longer change
+  colour as you zoom in, and land Blizzard reshaped shows as it is now. The open sea stays one calm blue.
+
 ## Azeroth Unrolled 1.3.0 (2026-10-07) - minimap imagery, party bubbles, smooth flights
 
 - Fixed: zooming with the mouse wheel while the map follows you (or a party member) lost track of them - the map

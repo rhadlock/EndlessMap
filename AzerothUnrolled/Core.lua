@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - one continuous camera over the whole world map.
+Endless Map - one continuous camera over the whole world map.
 
 Scroll from the Azeroth map straight down into a zone and past it (e.g. onto
 the Deadmines entrance), drag across zone borders, no map-switch jumps.
@@ -26,6 +26,7 @@ How it stays friendly with Questie and other map addons:
 ]]
 
 local ADDON, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local DEFAULTS = {
     enabled = true,
@@ -1890,13 +1891,23 @@ local function ExportCore()
         end,
         JustShown = function() return justShown end,
         Wake = function() if ready then driver:Show() end end,
+        -- (1.3.1: the fog of war, Gilneas.lua) an area discovered: as MAP_EXPLORATION_UPDATED - the explored art rebuilt
+        -- where it is used, and drawn at once at rest
+        ExplorationChanged = function()
+            if not ready then return end
+            Render:MarkArtDirty()
+            if state == "rest" or state == "hold" then
+                restBusy = true
+                driver:Show()
+            end
+        end,
     }
 end
 
 local function Setup()
     if ready or not WorldMapFrame or not WorldMapFrame.ScrollContainer then return end
     if not ns.BuildRegistry() then
-        print("|cff33ccffAzeroth Unrolled|r: couldn't read the world map layout; addon disabled.")
+        print("|cff33ccffEndless Map|r: couldn't read the world map layout; addon disabled.")
         return
     end
 
@@ -2036,7 +2047,7 @@ end
 -- Slash commands
 ---------------------------------------------------------------------------
 local function Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffAzeroth Unrolled|r: " .. msg)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff33ccffEndless Map|r: " .. msg)
 end
 
 local function OnOff(b) return b and "|cff40ff40on|r" or "|cffff4040off|r" end
@@ -2055,6 +2066,7 @@ end
 
 SLASH_AZEROTHUNROLLED1 = "/unroll"
 SLASH_AZEROTHUNROLLED2 = "/azerothunrolled"
+SLASH_AZEROTHUNROLLED3 = "/endlessmap" -- (1.3.1: the add-on's name; /unroll stays the short form the messages name)
 SlashCmdList.AZEROTHUNROLLED = function(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
     local num = tonumber(arg)
@@ -2127,10 +2139,15 @@ SlashCmdList.AZEROTHUNROLLED = function(input)
         end)
         Print(("pins shown: %d, levels %s-%s, strata %s"):format(n, tostring(lo), tostring(hi), tostring(strata)))
         if ns.Dungeon then Print(ns.Dungeon:DebugLine()) end
+        if ns.OtherCopies then -- (1.3.1, OneCopy.lua) the copies of the add-on that stood down for this one
+            local others = ns.OtherCopies()
+            if others then Print(others) end
+        end
     else
         Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s, flight: %s) | dungeons %s"):format(
             OnOff(db.enabled), db.maxZoom, db.zoomStep, db.flySpeed,
             OnOff(db.labels), OnOff(db.labelsAtRest), OnOff(db.flightPaths), OnOff(db.dungeons)))
+        Print("/endlessmap <command> always works; /unroll <command> is the short form:")
         Print("/unroll on | off")
         Print("/unroll depth <1-10>   how far past a zone you can zoom")
         Print("/unroll step <1.05-2>  zoom per wheel notch")
@@ -2187,7 +2204,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
             -- (1.2.0) The same for the caves: every default is written into the saved settings below, so a changed default
             -- reaches nobody who ran the old one (the 1.2.0 betas left 20, then 52 - or a zoom picked while
             -- testing them). Each new cave default (1.2.0: 30) bumps this stamp: what was saved gives way to it once (with the
-            -- zoom Azeroth Unrolled's caves button remembered); later /unroll cavezoom choices are kept.
+            -- zoom the add-on's caves button remembered); later /unroll cavezoom choices are kept.
             if db.caveZoomRev ~= 362 then db.caveZoom, db.caveZoomWas, db.caveZoomRev = nil, nil, 362 end
             for k, val in pairs(DEFAULTS) do
                 if db[k] == nil then db[k] = val end
@@ -2199,6 +2216,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
             Setup()
         end
     elseif event == "PLAYER_LOGIN" then
+        -- (1.3.1) Every copy of the add-on declares this one saved table. A copy that loaded after this one (and stood
+        -- down: OneCopy.lua) had its saved file replace the global after our ADDON_LOADED; the game writes the global into
+        -- every copy's file at logout, so it must be the table this copy uses (or what changes now would be lost).
+        if db and AzerothUnrolledDB ~= db then AzerothUnrolledDB = db end
         Setup()
     elseif event == "MAP_EXPLORATION_UPDATED" then
         if ready then

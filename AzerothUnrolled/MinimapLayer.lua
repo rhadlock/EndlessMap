@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 --[[
 MinimapLayer (1.3.0): the world map drawn from the game's own minimap pictures - the real terrain - instead of
@@ -38,7 +39,9 @@ LOD_C1; built from 2.0) - every picture is desaturated (FOG_DESAT) and darkened 
 pictures are drawn through the explored-area tiles of every zone near the view (C_MapExplorationInfo, Blizzard's own
 tiling of them: one mask per tile, as Render's footprints; a union of masks is drawn as stacked copies - masks on one
 texture would intersect), each copy cut to the tile's used part (CLAMP), one mask per texture. The six capitals' cells
-(ZoneMasks) are always explored, the sea always in colour (the sea masks lie above the fog). Below continent zoom 2.5
+(ZoneMasks) are always explored; (1.3.1: the fog of war) Gilneas's explored areas are lit through their pieces' masks
+(Gilneas.lua G:FogTiles - Blizzard has no explored areas there: the add-on's own, one tile per explored area), its
+unexplored land greys as anywhere; the sea always in colour (the sea masks lie above the fog). Below continent zoom 2.5
 the imagery is all in colour, as Blizzard's continent maps have no fog. MAP_EXPLORATION_UPDATED (Render:MarkArtDirty)
 rebuilds the copies: those that stay keep their texture - nothing blinks.
 
@@ -381,6 +384,8 @@ local function MaskTiles(m, x0, y0, x1, y1)
         end
     end
     CapitalTiles(out, m)
+    -- (1.3.1: the fog of war) Gilneas (Gilneas.lua): the pieces of its explored areas - the rest greys, as anywhere
+    if ns.Gilneas then ns.Gilneas:FogTiles(g.cont, W0, H0, x0, y0, x1, y1, out) end
     return out
 end
 
@@ -794,7 +799,12 @@ function L:PinHidden() return pinHidden, pin end
 local lastCam
 local function PreviewOf(x, y, imagery)
     if imagery then
-        local e = ns.DeepestMapAt and ns.DeepestMapAt(x, y)
+        -- (1.3.1 review) where Gilneas's page shows on the drawn map (Gilneas.lua): its own picture there (1.3.1: the fog of
+        -- war - its unexplored look, as a zone's base picture below)
+        local gf, gl, gr, gt, gb = nil, nil, nil, nil, nil
+        if ns.Gilneas then gf, gl, gr, gt, gb = ns.Gilneas:PreviewAt(x, y) end
+        if gf then return gf, gl, gr, gt, gb end
+        local e = ns.DeepestMapAt and ns.DeepestMapAt(x, y, true) -- (1.3.1: a real map - its art from C_Map)
         local layers = e and C_Map.GetMapArtLayers and C_Map.GetMapArtLayers(e.id)
         local Ly = layers and layers[1]
         local files = e and Ly and C_Map.GetMapArtLayerTextures and C_Map.GetMapArtLayerTextures(e.id, 1)

@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - Follow.lua (1.1.0)
+Endless Map - Follow.lua (1.1.0)
 
 Two ways to put a character in the middle of the map (the user, 2026-10-05):
   * Click your own arrow, or a party / raid member's dot, on the world map: the map follows them. It pans with them,
@@ -19,6 +19,7 @@ with a little room around; the nearest wins. Nothing here is protected: it works
 map never changes (Core.lua: the view then stays on the current map).
 ]]
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local F = {}
 ns.Follow = F

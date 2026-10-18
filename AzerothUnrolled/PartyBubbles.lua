@@ -1,5 +1,5 @@
 --[[
-Azeroth Unrolled - PartyBubbles.lua (1.3.0)
+Endless Map - PartyBubbles.lua (1.3.0)
 
 Party bubbles on the world map (the user, 2026-10-06: "small icons, on the upper left hand side of the map. party
 member bubbles. if you click one it goes to the person and tracks them, when you hover over the bubble it shows the
@@ -40,6 +40,7 @@ Nothing here is protected: plain buttons, no secure template, no unit menu; ever
 only (a secret value is no value), and any of them may be missing (an older client, the offline harness).
 ]]
 local _, ns = ...
+if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
 
 local B = {}
 ns.Bubbles = B
@@ -227,6 +228,15 @@ local function RaidZone(u)
     if ok and Str(zone) then return zone end
 end
 
+-- (1.3.1 review) Where the game has only a continent's map for them: the zone the add-on draws there itself, if any
+-- (Gilneas.lua: no uiMap - the game's answer is "Eastern Kingdoms" while the map names the land Gilneas).
+local function OwnZoneOf(u)
+    local x, y
+    if ns.Gilneas and ns.Follow then x, y = ns.Follow:Position(u) end
+    local z = x and ns.Gilneas:ZoneAt(x, y)
+    if z and Str(z.name) then return z.name end
+end
+
 -- Their uiMap's name (C_Map.GetBestMapForUnit: the player and the party - MapDocumentation.lua:49-63), in a raid the
 -- roster's zone, else the map under their position; offline: "Offline".
 local function ZoneOf(u)
@@ -235,7 +245,10 @@ local function ZoneOf(u)
         local ok, id = pcall(C_Map.GetBestMapForUnit, u)
         if ok and Num(id) then
             local ok2, info = pcall(C_Map.GetMapInfo, id)
-            if ok2 and type(info) == "table" and Str(info.name) then return info.name end
+            if ok2 and type(info) == "table" and Str(info.name) then
+                local wide = Num(info.mapType) and info.mapType <= (ns.MAPTYPE_CONTINENT or 2)
+                return wide and OwnZoneOf(u) or info.name
+            end
         end
     end
     local zone = RaidZone(u)
