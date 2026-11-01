@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.5.0
+
+- **WoW Forever: every boat, zeppelin, skycutter, portal and the tram on the map** (1.5.0-beta1). A marker at each dock and portal from the zoom the continents fill the view, your faction's ways only; hover for an arc to where it goes, click a way to fly there. Zephras Isle has no place on the Azeroth map: its arc rises off the top and a click opens Blizzard's map of the isle. The Deeprun Tram keeps its door: hover for the arc, click for the tram's map. `/unroll portals` turns the markers off and on. Names are in English. Classic Era shows only the routes it has.
+
 ## Endless Map 1.4.0 - retail
 
 - **`/emap`** (1.4.0-beta4): a short form of `/endlessmap` on WoW Forever and Classic Era too; nothing else changes

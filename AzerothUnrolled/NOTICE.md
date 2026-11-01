@@ -13,7 +13,8 @@ version 3 of the License, or (at your option) any later version (SPDX: `GPL-3.0-
 distributed in the hope that they will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
 of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. The full licence text is in the file `LICENSE`.
 
-The project icon (`Media\icon.tga`) is an original drawing made for this add-on and is under the same licence.
+The project icon (`Media\icon.tga`) and the markers of the ways across the world (`Media\Ways\portal.tga`, `boat.tga`, `zeppelin.tga`, `tram.tga`, `spark.tga`, drawn by the
+author's tools) are original drawings made for this add-on and are under the same licence.
 
 ## 2. What the licence does not cover: Blizzard's game data
 

@@ -2,7 +2,7 @@
 ## Title: Endless Map
 ## Notes: One smooth zoom over the whole world map, from space down to every zone and back. Settings: the round button on the map, or /emap.
 ## Author: Hadlock
-## Version: 1.4.0
+## Version: 1.5.0
 ## SavedVariables: EndlessMapDB
 ## X-License: GPL-3.0-or-later
 ## IconTexture: Interface\AddOns\AzerothUnrolled\Media\icon
@@ -49,7 +49,7 @@ RetailParty.lua
 RetailGroup.lua
 RetailDoors.lua
 RetailPins.lua
-RetailPortals.lua
+Portals.lua
 Options.lua
 MapMenu.lua
 OptionsPanel.lua

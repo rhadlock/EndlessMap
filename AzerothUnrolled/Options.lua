@@ -47,7 +47,7 @@ local function NotRetail() return ns.FLAVOR ~= "retail" end
 local RETAIL_HAS = {
     dungeonIcons = function() return ns.RetailDoors ~= nil end,
     flightPaths = function() return ns.RetailDoors ~= nil end,
-    portals = function() return ns.RetailPortals ~= nil end,
+    portals = function() return ns.Portals ~= nil end,
     caveZoom = function() return ns.RetailCaves ~= nil end,
     cells = function() return ns.RetailCells ~= nil end,
     imageryTiles = function() return ns.RetailImagery ~= nil end,
@@ -191,7 +191,7 @@ Add({ key = "labels", kind = "bool", cmd = "labels", said = "place labels ",
     end })
 Add({ key = "labelsAtRest", kind = "bool", cmd = "rest", said = "labels while the map is still ", apply = Redraw })
 Add({ key = "flightPaths", kind = "bool", cmd = "flight", said = "flight master labels ", apply = Redraw })
-if ns.FLAVOR == "retail" then Add({ key = "portals", kind = "bool", cmd = "portals", said = "portal markers ", apply = Redraw }) end
+Add({ key = "portals", kind = "bool", cmd = "portals", said = "portal markers ", apply = Redraw }) -- (1.5.0: on WoW Forever too)
 Add({ key = "mosaic", kind = "bool", cmd = "mosaic", said = "zone map mosaic ", apply = Redraw })
 Add({ key = "cells", kind = "bool", cmd = "cells", said = "seamless zone cells ", apply = Redraw })
 Add({ key = "engineMarkers", kind = "bool", cmd = "markers",
@@ -301,6 +301,7 @@ function O:Help()
         -- (1.4.0) retail: the commands it has there (1.4.0-beta3: the doors, the flight masters, the caves, the imagery)
         Say(c .. " names | icons   toggle place names / dungeon and raid doors on the map (click a door's name: fly there)")
         Say(c .. " flight          toggle the flight masters' names")
+        Say(c .. " portals         toggle the markers of the boats, zeppelins, portals and trams (hover: where it goes; click a way: fly there)")
         Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
         Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
         Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
@@ -309,6 +310,7 @@ function O:Help()
         return
     end
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
+    Say(c .. " portals         toggle the markers of the boats, zeppelins, portals and trams (hover: where it goes; click a way: fly there)")
     Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
     Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")

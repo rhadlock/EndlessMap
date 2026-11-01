@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.5.0 (in work) - retail
+
+- A marker's list of ways and its arcs lie over everything on the map, and a click on the list is always the list's, also over your arrow or a door. A destination's name at the map's top edge is no longer cut off.
+
 ## Endless Map 1.4.0 - retail
 
 The first release on retail World of Warcraft (12.1.5).

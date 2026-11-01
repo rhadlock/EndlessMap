@@ -226,7 +226,6 @@ function Labels:AddRow(d) return AddRow(d) end
 -- (1.4.0-beta3, retail: RetailDoors.lua, RetailCaves.lua - the names of cities, doors, flight masters and caves from their
 -- data) an item at point (x, y) of the camera's space
 function Labels:Add(x, y, text, kind, owner) return Add(x, y, text, kind, owner) end
-function Labels:Layer() return layer end -- ((1.4.0-beta14, retail: RetailPortals.lua) the frame the names lie in)
 function Labels:Items() return items end
 
 -- The dungeon icons of each detail level (ns.DETAIL_MAPS, Render.lua): at the
@@ -588,7 +587,7 @@ function Labels:Draw(cam, v)
             -- ((1.4.0-beta10, retail: RetailPins.lua - it.mapBand) a map's own marker comes and goes with that map's picture
             -- (Render:MapAlpha): every map drawn shows its own, each at once - not a band of its own zoom)
             if it.worldOn then
-                -- ((1.4.0-beta14, retail: RetailPortals.lua) from a zoom of the world, whatever map it lies on: a band of 8%)
+                -- ((1.4.0-beta14: Portals.lua) from a zoom of the world, whatever map it lies on: a band of 8%)
                 local t = (ns.WorldZoom(v, cam.vw) - it.worldOn * 0.92) / (it.worldOn * 0.08)
                 a = t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t)
             elseif it.mapBand then

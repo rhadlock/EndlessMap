@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.4.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.5.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -26,6 +26,8 @@ dungeon entrance, drag across zone borders, and see the important places along t
   party bubbles lie above it).
 - Click your arrow (or a party member's dot) and the map follows them - if they take a portal or their hearthstone,
   the map flies after them; M opens the map on your character at world zoom 14, and follows you.
+- Every boat, zeppelin, skycutter, portal and the tram of your faction (1.5.0, WoW Forever; Classic Era: the routes it has): a marker at each
+  dock from the zoom the continents fill the view. Hover one for an arc to where it goes, click a way to fly there.
 - Party bubbles: you and your party (in a raid: your own group) as small round portraits in the map's top left corner,
   under the map-pin button (WoW Forever). Hover one for the zone they are in; click it and the map flies to them - out, across and
   back in - and follows them (click it again to stop). The bubble of the one followed glows; offline or dead members
@@ -138,6 +140,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll on`, `/unroll off` | the smooth zoom on / off (Blizzard's map as usual when off) |
 | `/unroll depth <1-10>` | how far past a zone's own map you can zoom (default 4) |
 | `/unroll step <1.05-2>` | zoom per wheel notch (default 1.3) |
+| `/unroll portals` | the markers of the boats, zeppelins, skycutters, portals and the tram on / off (default on) |
 | `/unroll speed <0.25-4>` | speed of the map's flights - a click on a zone, a party bubble, following someone through a portal (default 1) |
 | `/unroll labels` / `rest` / `flight` | place names and dungeon icons together on / off; the addon's names and icons while the map is still; flight-master names |
 | `/unroll names` | place names on / off |

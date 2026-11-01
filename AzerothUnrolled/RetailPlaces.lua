@@ -480,7 +480,7 @@ ns.RETAIL_PLACES = {
         { j = 1296, k = "r", z = 2346, x = 0.4212, y = 0.5041, lv = { 80, 80 }, bp = 1, n = "Liberation of Undermine" },
     },
     -- (1.4.0-beta14) the ways across the world, by where they leave from: z, x, y; k p portal, b boat, z zeppelin, t tram; f 1 Alliance, 2 Horde, 0 both;
-    -- n its name; tz, tx, ty its end (RetailPortals.lua)
+    -- n its name; tz, tx, ty its end (Portals.lua)
     portals = {
         { z = 1, x = 0.5597, y = 0.1318, l = {
             { k = "z", f = 2, n = "Zeppelin to the Waking Shores", tz = 2022, tx = 0.8163, ty = 0.2796 },

@@ -51,7 +51,7 @@ local DEFAULTS = {
     caveZoom = ns.Render.CAVE_G, -- (1.2.0) WORLD zoom from which the caves show (Caves.lua; /unroll cavezoom; false: never)
 }
 
-if ns.FLAVOR == "retail" then DEFAULTS.portals = true end -- ((1.4.0-beta14) the ways across the world: RetailPortals.lua)
+DEFAULTS.portals = true -- ((1.4.0-beta14) the ways across the world: Portals.lua)
 
 local IDLE_DELAY = 0.2      -- seconds without input before handing over
 local ZOOM_RATE = 14        -- how quickly the zoom catches up to the wheel
@@ -2049,10 +2049,10 @@ end
 OurClick = function(button)
     -- (1.1.0, Follow.lua) a click on your arrow or a party member's dot follows them (on the one followed: stops)
     if ns.Follow and ns.Follow:OnCanvasClick(button) then return true end
+    -- ((1.4.0-beta14, Portals.lua) a way across the world: a flight to its end - 1.5.0: before Dungeon.lua, whose bare detail art takes any click on it)
+    if ns.Portals and ns.Portals:OnCanvasClick(button) then return true end
     -- (Dungeon.lua) a click on a dungeon / raid entrance label opens its maps
     if ns.Dungeon and ns.Dungeon:OnCanvasClick(button) then return true end
-    -- ((1.4.0-beta14, retail: RetailPortals.lua - nil on WoW Forever) a way across the world: a flight to its end)
-    if ns.RetailPortals and ns.RetailPortals:OnCanvasClick(button) then return true end
     -- (1.4.0-beta3, retail: RetailDoors.lua - nil on WoW Forever) a click on a door's name flies there, then opens its map;
     -- (1.4.0-beta10: RetailPins.lua) a flight master's, a point of interest's, a quest's
     if ns.RetailDoors and ns.RetailDoors:OnCanvasClick(button) then return true end
