@@ -15,7 +15,8 @@ Positions: UnitPosition (UnitDocumentation.lua; plain numbers only - a secret va
 the continent's own map (C_Map.GetMapPosFromWorldPos with the continent as the override) -> the camera's world units.
 Inside instances the game gives no position: nothing to follow there, and M opens as the game does.
 Hit test: the arrow and the dots where Blizzard's group pin draws them (27 / 11 / 8.25 px: GroupMembersDataProvider),
-with a little room around; the nearest wins. Nothing here is protected: it works the same in combat, where only the
+with a little room around; the nearest wins ((1.4.0-beta11) on retail RetailGroup.lua's, drawn at these positions;
+Blizzard's shows none there). Nothing here is protected: it works the same in combat, where only the
 map never changes (Core.lua: the view then stays on the current map).
 ]]
 local _, ns = ...
@@ -71,7 +72,14 @@ function F:Position(u)
     if not (UnitPosition and C_Map and C_Map.GetMapPosFromWorldPos and CreateVector2D and ns.GetMap) then return end
     local ok, x, y, _, inst = pcall(UnitPosition, u)
     if not ok or not (Num(x) and Num(y) and Num(inst)) then return end
-    local cont = CONT_UIMAP[inst]
+    local cont
+    if ns.NodeForWorldPos then
+        -- (1.4.0, retail: RetailSpace.lua) the map the game map's region holding the position belongs to - map 530 is
+        -- Outland, the Draenei isles and old Quel'Thalas; the camera's units are the Cosmic map's
+        cont = ns.NodeForWorldPos(inst, x, y)
+    else
+        cont = CONT_UIMAP[inst]
+    end
     local M = cont and ns.GetMap(cont)
     if not M then return end
     local ok2, _, pos = pcall(C_Map.GetMapPosFromWorldPos, inst, CreateVector2D(x, y), cont)
@@ -87,13 +95,18 @@ function F:UnitAt(sx, sy)
     if not (cam and v and v.W and v.W > 0) then return end
     local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
     local best, bestD
-    local function Try(u, r)
-        local x, y = self:Position(u)
-        if not x then return end
+    local function At(u, r, x, y)
         local dx = v.W / 2 + (x - cam.x) * ppx - sx
         local dy = v.H / 2 + (y - cam.y) * ppy - sy
         local d = dx * dx + dy * dy
         if d <= r * r and (not bestD or d < bestD) then best, bestD = u, d end
+    end
+    -- (1.4.0-beta11, retail: RetailGroup.lua draws the arrow and the dots here - at Position, the add-on's layout -, and
+    -- Blizzard's pin shows none: the second spot 1.4.0 took, where Blizzard's pin drew them, went)
+    local function Try(u, r)
+        local x, y = self:Position(u)
+        if not x then return end
+        At(u, r, x, y)
     end
     Try("player", PLAYER_HIT)
     for _, u in ipairs(Members()) do Try(u, MEMBER_HIT) end
@@ -130,7 +143,12 @@ local function ShowLabel(show)
 end
 
 -- The game's own "you are here" ping on your arrow (GroupMembersPinMixin: StartPlayerPing), as when the map opens.
+-- ((1.4.0-beta11, retail) the arrow is RetailGroup.lua's: its ping - ns.PingPlayer)
 local function Ping()
+    if ns.PingPlayer then
+        ns.PingPlayer()
+        return
+    end
     if not (WorldMapFrame and WorldMapFrame.EnumeratePinsByTemplate) then return end
     pcall(function()
         for pin in WorldMapFrame:EnumeratePinsByTemplate("GroupMembersPinTemplate") do
@@ -228,7 +246,9 @@ local function AfterToggle()
     if not (core and core.JustShown and core.JustShown() and core.JumpToZoom) then return end -- (only when it opened)
     if ns.Dungeon and ns.Dungeon.IsActive and ns.Dungeon:IsActive() then return end
     local x, y = F:Position("player")
-    if x and core.JumpToZoom(x, y, db.openZoom) and db.openFollow ~= false then
+    -- (1.4.0, retail: ns.OpenZoomFor, RetailSpace.lua - the setting means a view as wide in yards as WoW Forever's)
+    local z = x and ns.OpenZoomFor and ns.OpenZoomFor(x, y, db.openZoom) or db.openZoom
+    if x and core.JumpToZoom(x, y, z) and db.openFollow ~= false then
         F:Start("player", true) -- (1.2.0: and follows you)
     end
 end
@@ -248,7 +268,7 @@ function F:Slash(cmd, num, Print, arg)
     if cmd == "openfollow" then
         db.openFollow = (db.openFollow == false)
         Print("M opens the map following you: " .. (db.openFollow and "on" or "off")
-            .. (db.openFollow and not db.openZoom and " (while M opens the map on you: /unroll openzoom is off)" or ""))
+            .. (db.openFollow and not db.openZoom and (" (while M opens the map on you: %s openzoom is off)"):format(ns.COMMAND) or ""))
         return
     end
     if cmd == "follow" then
@@ -264,7 +284,7 @@ function F:Slash(cmd, num, Print, arg)
     elseif arg == "default" or arg == "reset" or arg == "on" then
         db.openZoom = 14
     elseif arg and arg ~= "" then
-        Print(("openzoom: a world zoom between %d and %d (read it with /unroll zoom), default (14) or off"):format(OPEN_ZOOM_MIN, OPEN_ZOOM_MAX))
+        Print(("openzoom: a world zoom between %d and %d (read it with %s zoom), default (14) or off"):format(OPEN_ZOOM_MIN, OPEN_ZOOM_MAX, ns.COMMAND))
     end
     if db.openZoom then
         Print(("M opens the map on your character at world zoom %.2fx"):format(db.openZoom))

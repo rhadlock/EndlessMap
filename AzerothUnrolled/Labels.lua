@@ -76,6 +76,16 @@ local function DotHalf(s)
     if s.icon then return s.dot * 0.7072 + 1.5 end
     return s.dot / 2
 end
+-- ((1.4.0-beta10, retail: RetailPins.lua) an item with a picture of its own - it.pic { atlas or file + tc, w, h }: the
+-- game's icon of a flight master or a point of interest - takes half its height; else its style's dot. nil on WoW Forever)
+-- ((1.4.0-beta11) a picture over a base - it.pic.base, bw, bh: a quest's round button under its icon - the taller of the two)
+local function ItemHalf(it)
+    if it.pic then return math.max(it.pic.h, it.pic.bh or 0) / 2 end
+    return it.style.dot and DotHalf(it.style)
+end
+-- ((1.4.0-beta11, retail: RetailPins.lua - it.zmin) a map's marker that waits for a deeper view of its map than the map's
+-- picture itself: the quest offers a quest hub stands for until its map is ZMIN_RAMP short of zmin, fully in at zmin)
+local ZMIN_RAMP = 0.8
 
 -- Visibility bands, in zoom of the owning map (1 = that map fills the view).
 -- Zone/city names give way as their own art fades in (Render.FADE_Z0/Z1).
@@ -90,6 +100,12 @@ local function AlphaFor(kind, z, owner, v, mm)
         return 0
     end
     if kind == "continent" then
+        -- (1.4.0, retail: owner.pe, the map it is placed on - RetailSpace.lua) a continent's name belongs to the view of
+        -- the map it lies on: by how far that map is zoomed (Quel'Thalas on the Eastern Kingdoms, Argus on the Broken
+        -- Isles); world and continent names on space and on Azeroth are in Blizzard's own pictures
+        if owner.pe then
+            return ns.Band(z / ns.ZoomOf(v, owner, ns.WidthForZoom(v, owner.pe, 1)), 0.5, 0.7, 1.6, 2.4)
+        end
         -- Continent names belong to the Azeroth view: judge them by how far
         -- the world map is zoomed, not by the continent's own zoom.
         return ns.Band(z / ns.ZoomOf(v, owner, 1), 0, 0, 1.6, 2.4)
@@ -144,8 +160,15 @@ function Labels:Build()
     local capital = {}
     for _, id in ipairs(ns.CAPITALS) do capital[id] = true end
 
-    for _, e in ipairs(ns.drawList) do
-        if e.mapType == ns.MAPTYPE_CONTINENT then
+    -- (1.4.0-beta1, retail: every place, shown or not - RetailSpace.lua ns.SpaceAll; a floor or copy swapped in later
+    -- had no name: owner.spaceHidden decides what shows)
+    for _, e in ipairs(ns.SpaceAll or ns.drawList) do
+        if e.lab ~= nil then
+            -- (1.4.0, retail: RetailTree.lua's lab - "c" a continent's name, "z" a zone's, false none: the worlds and
+            -- what lies on space or on Azeroth, whose names Blizzard's pictures print)
+            if e.lab == "c" then Add(e.cx, e.cy, e.name, "continent", e)
+            elseif e.lab == "z" then Add(e.cx, e.cy, e.name, "zone", e) end
+        elseif e.mapType == ns.MAPTYPE_CONTINENT then
             Add(e.cx, e.cy, e.name, "continent", e)
         elseif capital[e.id] then
             local it = Add(e.cx, e.cy, e.name, "city", e)
@@ -200,6 +223,10 @@ end
 -- point (zone: the uiMap it belongs to, else the one the game names); an item's look changed (STYLE key) - its widgets are
 -- made again on the next draw.
 function Labels:AddRow(d) return AddRow(d) end
+-- (1.4.0-beta3, retail: RetailDoors.lua, RetailCaves.lua - the names of cities, doors, flight masters and caves from their
+-- data) an item at point (x, y) of the camera's space
+function Labels:Add(x, y, text, kind, owner) return Add(x, y, text, kind, owner) end
+function Labels:Layer() return layer end -- ((1.4.0-beta14, retail: RetailPortals.lua) the frame the names lie in)
 function Labels:Items() return items end
 
 -- The dungeon icons of each detail level (ns.DETAIL_MAPS, Render.lua): at the
@@ -316,7 +343,23 @@ local function EnsureWidgets(it)
     it.fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", s.size, "OUTLINE")
     it.fs:SetTextColor(s.r, s.g, s.b)
     it.fs:SetText(it.text)
-    if s.dot then
+    if it.pic then
+        -- ((1.4.0-beta10, retail: RetailPins.lua) the game's own icon of the place - its atlas, or a file and its coords)
+        local p = it.pic
+        it.dot = layer:CreateTexture(nil, "OVERLAY", nil, 2)
+        if p.atlas then it.dot:SetAtlas(p.atlas) else it.dot:SetTexture(p.file) end
+        if p.tc then it.dot:SetTexCoord(p.tc[1], p.tc[2], p.tc[3], p.tc[4]) end
+        if p.tint then it.dot:SetVertexColor(p.tint[1], p.tint[2], p.tint[3]) end
+        it.dot:SetSize(p.w, p.h)
+        it.dot:Hide()
+        if p.base then
+            -- ((1.4.0-beta11) its base under it - a quest's round button, POIButton's NormalTexture - in the rim's place)
+            it.rim = layer:CreateTexture(nil, "OVERLAY", nil, 1)
+            it.rim:SetAtlas(p.base)
+            it.rim:SetSize(p.bw or p.w, p.bh or p.h)
+            it.rim:Hide()
+        end
+    elseif s.dot and not s.nodot then -- ((1.4.0-beta3) nodot: the dot's room kept, nothing drawn - a name over Blizzard's pin)
         if s.icon then
             -- (a dark rim: the icon reads on any map art)
             it.rim = layer:CreateTexture(nil, "OVERLAY", nil, 1)
@@ -344,6 +387,7 @@ local function EnsureWidgets(it)
     end
     it.fs:Hide()
     it.shown = false
+    it.fsOn, it.dotOn, it.drawnA, it.fsX, it.fsY, it.dotX, it.dotY = false, false, nil, nil, nil, nil, nil -- ((1.4.0-beta15) new widgets: ShowItem)
 end
 
 -- (1.0.0) the "you are inside" marker: the round player icon over the door icon (Doors.lua pulses its alpha)
@@ -360,6 +404,7 @@ end
 local function HideItem(it)
     if not it.shown then return end
     it.shown = false
+    it.drawnA, it.fsOn, it.dotOn = nil, false, false
     if it.fs then it.fs:Hide() end
     if it.dot then it.dot:Hide() end
     if it.rim then it.rim:Hide() end
@@ -369,31 +414,47 @@ end
 
 -- Place a label's widgets: the name centred at (cx, ty) unless text is
 -- false, its dot / icon at (cx, cy).
+-- ((1.4.0-beta15) only what changed asked of the client, as RetailRender.lua's parts: 12 calls a marker a frame before, four a widget. One anchor each: SetPoint replaces it)
 local function ShowItem(it, cx, cy, ty, text, tx)
+    local a = it.alpha
+    local newA = it.drawnA ~= a
+    it.drawnA = a
+    local fs = it.fs
     if text then
-        it.fs:ClearAllPoints()
-        it.fs:SetPoint("CENTER", layer, "TOPLEFT", tx or cx, -ty)
-        it.fs:SetAlpha(it.alpha)
-        it.fs:Show()
-    else
-        it.fs:Hide()
+        local fx = tx or cx
+        if it.fsX ~= fx or it.fsY ~= ty then
+            fs:SetPoint("CENTER", layer, "TOPLEFT", fx, -ty)
+            it.fsX, it.fsY = fx, ty
+        end
+        if newA or not it.fsOn then fs:SetAlpha(a) end
+        if not it.fsOn then
+            fs:Show()
+            it.fsOn = true
+        end
+    elseif it.fsOn ~= false then
+        fs:Hide()
+        it.fsOn = false
     end
+    local moved = it.dotX ~= cx or it.dotY ~= cy
+    if moved then it.dotX, it.dotY = cx, cy end
     if it.dot then
-        it.dot:ClearAllPoints()
-        it.dot:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy)
-        it.dot:SetAlpha(it.alpha)
-        it.dot:Show()
+        local d = it.dot
+        if moved then d:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy) end
+        if newA then d:SetAlpha(a) end
+        local first = not it.dotOn
+        if first then
+            d:Show()
+            it.dotOn = true
+        end
         if it.rim then
-            it.rim:ClearAllPoints()
-            it.rim:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy)
-            it.rim:SetAlpha(it.alpha)
-            it.rim:Show()
+            if moved then it.rim:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy) end
+            if newA then it.rim:SetAlpha(a) end
+            if first then it.rim:Show() end
         end
         if it.hole then
-            it.hole:ClearAllPoints()
-            it.hole:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy)
-            it.hole:SetAlpha(it.alpha)
-            it.hole:Show()
+            if moved then it.hole:SetPoint("CENTER", layer, "TOPLEFT", cx, -cy) end
+            if newA then it.hole:SetAlpha(a) end
+            if first then it.hole:Show() end
         end
     end
     if it.here then
@@ -429,12 +490,66 @@ local function ByPriority(a, b)
     return a.seq < b.seq
 end
 
+-- ((1.4.0-beta16, retail - WoW Forever walks them all, as before) Over a thousand markers tested each frame was a tenth of the add-on's Lua: those in the view by a grid over the
+-- items - when the view covers little of it -, those shown last frame apart (prevShown). An item moved says so: Labels:Moved. And at most NEW_WIDGETS markers a frame get their
+-- widgets, the most important first: a zoom out bringing in many maps made them all in one frame - up to 39 ms in the player's stamp.
+local RETAIL = ns.FLAVOR == "retail"
+local GRID_N = 48
+local NEW_WIDGETS = 12
+local gridOf, gridN, gridDirty, gridX0, gridY0, gridKX, gridKY
+local cand, prevShown = {}, {}
+local prevN, drawTick = 0, 0
+function Labels:Moved() gridDirty = true end
+local function BuildGrid()
+    gridOf, gridN, gridDirty = {}, #items, false
+    local x0, y0, x1, y1 = math.huge, math.huge, -math.huge, -math.huge
+    for i = 1, gridN do
+        local it = items[i]
+        if it.x < x0 then x0 = it.x end
+        if it.x > x1 then x1 = it.x end
+        if it.y < y0 then y0 = it.y end
+        if it.y > y1 then y1 = it.y end
+    end
+    gridX0, gridY0 = x0, y0
+    gridKX, gridKY = GRID_N / math.max(x1 - x0, 1e-9), GRID_N / math.max(y1 - y0, 1e-9)
+    for i = 1, gridN do
+        local it = items[i]
+        local k = math.min(GRID_N - 1, math.floor((it.y - y0) * gridKY)) * GRID_N + math.min(GRID_N - 1, math.floor((it.x - x0) * gridKX))
+        local b = gridOf[k]
+        if not b then
+            b = {}
+            gridOf[k] = b
+        end
+        b[#b + 1] = it
+    end
+end
+-- (the items in the cells over x0 .. y1, their count; nil: the view covers much of the grid - all of them)
+local function Candidates(x0, y0, x1, y1)
+    if not gridOf or gridDirty or gridN ~= #items then BuildGrid() end
+    local c0, c1 = math.max(0, math.floor((x0 - gridX0) * gridKX)), math.min(GRID_N - 1, math.floor((x1 - gridX0) * gridKX))
+    local r0, r1 = math.max(0, math.floor((y0 - gridY0) * gridKY)), math.min(GRID_N - 1, math.floor((y1 - gridY0) * gridKY))
+    if (c1 - c0 + 1) * (r1 - r0 + 1) > GRID_N * GRID_N / 4 then return nil end
+    local n = 0
+    for r = r0, r1 do
+        for c = c0, c1 do
+            local b = gridOf[r * GRID_N + c]
+            if b then
+                for i = 1, #b do
+                    n = n + 1
+                    cand[n] = b[i]
+                end
+            end
+        end
+    end
+    return cand, n
+end
+
 function Labels:Draw(cam, v)
     local W, H = v.W, v.H
     local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
 
-    -- Lazily pull flight masters for zones we are zoomed into.
-    if ns.db.flightPaths then
+    -- Lazily pull flight masters for zones we are zoomed into. (1.4.0: not on retail - Blizzard pins them there)
+    if ns.db.flightPaths and ns.FLAVOR ~= "retail" then
         for _, e in ipairs(ns.drawList) do
             if e.mapType == ns.MAPTYPE_ZONE and not taxiLoaded[e.id] and ns.RectContains(e, cam.x, cam.y)
                 and ns.ZoomOf(v, e, cam.vw) >= 0.6 then
@@ -445,16 +560,48 @@ function Labels:Draw(cam, v)
 
     local n = 0
     local mm = ns.MinimapLayer ~= nil and ns.MinimapLayer:Active() -- (1.3.0: the minimap imagery shows)
-    for _, it in ipairs(items) do
-        local sx = W / 2 + (it.x - cam.x) * ppx
-        local sy = H / 2 + (it.y - cam.y) * ppy
+    -- ((1.4.0-beta15) a marker off the view - the most of over a thousand, each frame: one test, in the camera's units, the screen's margins below)
+    local wx0, wx1 = cam.x + (-60 - W / 2) / ppx, cam.x + (W + 60 - W / 2) / ppx
+    local wy0, wy1 = cam.y + (-20 - H / 2) / ppy, cam.y + (H + 20 - H / 2) / ppy
+    local walk, walkN = items, #items
+    if RETAIL then
+        local c, cn = Candidates(wx0, wy0, wx1, wy1)
+        if c then walk, walkN = c, cn end
+        drawTick = drawTick + 1
+    end
+    for ii = 1, walkN do
+      local it = walk[ii]
+      it.cTick = drawTick
+      local ix, iy = it.x, it.y
+      if ix <= wx0 or ix >= wx1 or iy <= wy0 or iy >= wy1 then
+        if it.shown then HideItem(it) end
+      else
+        local sx = W / 2 + (ix - cam.x) * ppx
+        local sy = H / 2 + (iy - cam.y) * ppy
         local a, own = 0, 0
         if sx > -60 and sx < W + 60 and sy > -20 and sy < H + 20
             and (it.kind ~= "flight" or ns.db.flightPaths)
-            and ns.db[it.style.icon and "dungeonIcons" or "placeNames"] ~= false -- (Azeroth Unrolled 1.0.0: the two halves of the layer)
-            and not it.off and not (it.ghost and ns.db.doorHints == false) then -- (1.0.0: retired / placeholders off)
+            and ns.db[it.style.gate or (it.style.icon and "dungeonIcons" or "placeNames")] ~= false -- (Azeroth Unrolled 1.0.0: the two halves of the layer; 1.4.0-beta3: a style's own gate)
+            and not it.off and not (it.ghost and ns.db.doorHints == false) -- (1.0.0: retired / placeholders off)
+            and not it.owner.spaceHidden then -- (1.4.0, retail: a map the game does not show now - RetailSpace.lua)
             -- (1.3.1: Gilneas's names - it.homemade - in the imagery's bands everywhere: its page prints no names either)
-            a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm or it.homemade == true)
+            -- ((1.4.0-beta10, retail: RetailPins.lua - it.mapBand) a map's own marker comes and goes with that map's picture
+            -- (Render:MapAlpha): every map drawn shows its own, each at once - not a band of its own zoom)
+            if it.worldOn then
+                -- ((1.4.0-beta14, retail: RetailPortals.lua) from a zoom of the world, whatever map it lies on: a band of 8%)
+                local t = (ns.WorldZoom(v, cam.vw) - it.worldOn * 0.92) / (it.worldOn * 0.08)
+                a = t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t)
+            elseif it.mapBand then
+                a = ns.Render:MapAlpha(it.owner)
+                if it.zmin and a > 0 then
+                    -- ((1.4.0-beta11) it.zmin: not before its map is this deep - see ZMIN_RAMP)
+                    local z = ns.ZoomOf(v, it.owner, cam.vw)
+                    local t = (z - it.zmin * ZMIN_RAMP) / (it.zmin * (1 - ZMIN_RAMP))
+                    a = a * (t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t))
+                end
+            else
+                a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm or it.homemade == true)
+            end
             -- (1.3.0: a sub-zone's name; 1.3.1: the fog of war - Gilneas's, it.areaID)
             if (it.pieces or it.areaID) and a > 0 and not SubzoneExplored(it) then a = 0 end
             it.soft = nil
@@ -483,9 +630,31 @@ function Labels:Draw(cam, v)
         else
             HideItem(it)
         end
+      end
     end
     for i = n + 1, #sortBuf do sortBuf[i] = nil end
     table.sort(sortBuf, ByPriority)
+    if RETAIL then
+        -- ((1.4.0-beta16) shown last frame and out of the walk: gone; those with no widgets yet beyond the frame's few wait for the next draw - asked for at rest too)
+        for i = 1, prevN do
+            local it = prevShown[i]
+            if it.cTick ~= drawTick and it.shown then HideItem(it) end
+        end
+        local m, made = 0, 0
+        for i = 1, n do
+            local it = sortBuf[i]
+            if it.fs or made < NEW_WIDGETS then
+                if not it.fs then made = made + 1 end
+                m = m + 1
+                sortBuf[m] = it
+            end
+        end
+        if m < n then
+            for i = n, m + 1, -1 do sortBuf[i] = nil end
+            n = m
+            if ns.Core and ns.Core.Redraw then ns.Core.Redraw() end
+        end
+    end
 
     local count = 0
     -- (1.0.0) The instance icons of a detail level (it.portal) keep their ICON whenever the level shows - each is a click
@@ -513,21 +682,31 @@ function Labels:Draw(cam, v)
         local tw = (it.tw and it.tw > 0) and it.tw or 40
         local th = it.style.size + 2
         local cx, cy = it.sx, it.sy
-        local half = it.dot and DotHalf(it.style)
-        local ty = it.dot and (cy - half - 2 - th / 2) or cy
+        local half = ItemHalf(it) -- ((1.4.0-beta3) a nodot style's too: its name over the point; (1.4.0-beta10) it.pic's)
+        local ty = half and (cy - half - 2 - th / 2) or cy
         local x0, x1 = cx - tw / 2 - 2, cx + tw / 2 + 2
         local y0, y1 = ty - th / 2, ty + th / 2
-        if it.dot and not it.iconKept then y1 = cy + half end -- (iconKept: the name's own rect - its icon has one already)
+        if half and not it.iconKept then y1 = cy + half end -- (iconKept: the name's own rect - its icon has one already)
         local text = not it.iconOnly and not it.hereOnly
         if not text then x0, y0, x1, y1 = cx - half, cy - half, cx + half, cy + half end
         -- (1.0.0 review) a placeholder whose name the map's edge would cut (The Drowned City, at Stranglethorn's west edge)
         -- has the name moved inside the map while its icon is on it (the icon stays at its point); an icon leaving the map
         -- takes the name along beside it, so the name never jumps while the map moves
         local tx, soft = cx, 0 -- (soft: how much a part-faded label of the city switch covers this one, see placedSoft)
-        if text and it.ghost and half and tw + 8 < W then
+        -- ((1.4.0-beta12, retail) every icon's name kept on the map so, not a placeholder's alone, and one the map's top edge
+        -- would cut above its icon goes under it - the player's 1.4.0-beta11 photo 4: a raid's door at the top edge, its
+        -- name above it off the map, the door nameless)
+        local keepIn = half and (it.ghost or ns.FLAVOR == "retail")
+        local below = false
+        if text and keepIn and tw + 8 < W then
             tx = math.max(cx, math.min(tw / 2 + 4, cx + tw / 2 + 4))
             tx = math.min(tx, math.max(W - tw / 2 - 4, cx - tw / 2 - 4))
             x0, x1 = math.min(tx - tw / 2 - 2, cx - half), math.max(tx + tw / 2 + 2, cx + half)
+        end
+        if text and keepIn and ns.FLAVOR == "retail" and ty - th / 2 < 0 and cy >= 0 then
+            below = true
+            ty = cy + half + 2 + th / 2
+            y0, y1 = it.iconKept and (ty - th / 2) or (cy - half), ty + th / 2
         end
         if text and (x1 < 0 or x0 > W or y1 < 0 or y0 > H or Overlaps(x0, y0, x1, y1, count, nil, it.detail)) then
             -- (a dungeon / raid whose name has no room keeps its icon when the
@@ -546,20 +725,25 @@ function Labels:Draw(cam, v)
                 placedSoft[count + 1] = it.soft and it.alpha or false
                 placedLevel[count + 1] = it.detail or false
                 count = count + 4
-                x0, x1, y1 = math.min(x0, cx - half), math.max(x1, cx + half), cy + half
+                if below then
+                    x0, y0, x1 = math.min(x0, cx - half), cy - half, math.max(x1, cx + half)
+                else
+                    x0, x1, y1 = math.min(x0, cx - half), math.max(x1, cx + half), cy + half
+                end
             end
             it.shown = true
             it.x0, it.y0, it.x1, it.y1 = x0, y0, x1, y1
             ShowItem(it, cx, cy, ty, text, tx)
         elseif not text and (not it.style.icon or x1 < 0 or x0 > W or y1 < 0 or y0 > H
-            or (not it.here and Overlaps(x0, y0, x1, y1, count, it.ghost, it.detail))) then
+            or (not it.here and not it.always and Overlaps(x0, y0, x1, y1, count, it.ghost, it.detail))) then
             HideItem(it)
-        elseif it.alpha * (1 - ((text or it.here) and soft or softA)) <= 0.03 then
+        elseif it.alpha * (1 - ((text or it.here or it.always) and soft or softA)) <= 0.03 then
             HideItem(it) -- (1.0.0: all of it under a part-faded label of the city switch)
         else
             -- (1.0.0: as much of it as a part-faded label of the city switch lets through; not text: its icon's own
             -- rect was tested just above)
-            it.alpha = it.alpha * (1 - ((text or it.here) and soft or softA))
+            -- ((1.4.0-beta11) it.always: no rect tested - softA is another item's: not this one's)
+            it.alpha = it.alpha * (1 - ((text or it.here or it.always) and soft or softA))
             placed[count + 1], placed[count + 2], placed[count + 3], placed[count + 4] = x0, y0, x1, y1
             placedGhost[count + 1] = (it.ghost and text) and true or false
             placedSoft[count + 1] = it.soft and it.alpha or false
@@ -577,6 +761,17 @@ function Labels:Draw(cam, v)
             it.x0, it.y0, it.x1, it.y1 = x0, y0, x1, y1 -- (placed rect, container units)
             ShowItem(it, cx, cy, ty, text, tx)
         end
+    end
+    if RETAIL then
+        local m = 0
+        for i = 1, n do
+            local it = sortBuf[i]
+            if it.shown then
+                m = m + 1
+                prevShown[m] = it
+            end
+        end
+        prevN = m
     end
 end
 
@@ -607,7 +802,13 @@ local function Paint(it, lit)
     if it.fs then
         if lit then it.fs:SetTextColor(1, 1, 1) else it.fs:SetTextColor(s.r, s.g, s.b) end
     end
-    if it.dot then
+    if it.dot and it.pic then
+        -- ((1.4.0-beta10, retail: RetailPins.lua) the game's icon: grown, its own colours)
+        local k = lit and HOT_GROW or 1
+        local p = it.pic
+        it.dot:SetSize(p.w * k, p.h * k)
+        if it.rim then it.rim:SetSize((p.bw or p.w) * k, (p.bh or p.h) * k) end
+    elseif it.dot then
         local k = lit and HOT_GROW or 1
         it.dot:SetSize(s.dot * k, s.dot * k)
         if lit then it.dot:SetVertexColor(1, 1, 1) else it.dot:SetVertexColor(s.r, s.g, s.b) end
@@ -632,7 +833,19 @@ function Labels:MoveItem(it, c, x, y, zone)
     if zone and ns.maps[zone] then owner = ns.maps[zone] end
     HideItem(it)
     it.x, it.y, it.owner = mx, my, owner
+    gridDirty = true
     return true
+end
+
+-- ((1.4.0-beta10, retail: RetailPins.lua) an item whose name or picture changed (the game updated a marker): its widgets
+-- made again on the next draw)
+function Labels:Reset(it)
+    if hot == it then Labels:SetHot(nil) end
+    HideItem(it)
+    for _, k in ipairs({ "fs", "dot", "rim", "hole" }) do
+        if it[k] then it[k]:Hide() it[k] = nil end
+    end
+    it.tw = nil
 end
 
 -- (1.0.0, Doors.lua) an item's look (a STYLE key: a placeholder that became a learned door): the old widgets are hidden

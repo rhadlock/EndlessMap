@@ -68,7 +68,10 @@ end
 
 function Z:Update()
     if not (frame and frame:IsVisible()) then return end -- (1.0.0: only while the map shows)
-    text:SetText(table.concat(Lines(), "\n"))
+    local s = table.concat(Lines(), "\n")
+    if s == text.shownText then return end -- ((1.4.0-beta15) ten times a second: laid out only when it changed)
+    text.shownText = s
+    text:SetText(s)
     local w, h = text:GetStringWidth(), text:GetStringHeight()
     if type(w) ~= "number" or type(h) ~= "number" then w, h = 190, 30 end
     frame:SetSize(w + 12, h + 10)
@@ -101,7 +104,7 @@ local function SwitchSetting(cmd, num, arg, lo, hi, default, Print, offWords)
     if num == 0 or arg == "off" or (offWords and offWords[arg]) then return false end
     if arg == "default" or arg == "reset" or arg == "on" then return default end
     if arg and arg ~= "" then
-        Print(("%s: a world zoom from %g to %g (read it with /unroll zoom), default, or off"):format(cmd, lo, hi))
+        Print(("%s: a world zoom from %g to %g (read it with %s zoom), default, or off"):format(cmd, lo, hi, ns.COMMAND))
     end
 end
 
@@ -109,8 +112,12 @@ end
 -- text typed.
 function Z:Slash(cmd, num, Print, arg)
     local db, R = ns.db, ns.Render
-    if not (db and R and R.CityZoom) then
+    if not (db and R and R.ZoomLines) then
         Print("zoom: not available")
+        return
+    end
+    if (cmd == "cavezoom" and not R.CaveZoom) or (cmd == "cityzoom" and not R.CityZoom) then
+        Print(cmd .. ": WoW Forever only") -- (1.4.0: retail has no city switch - RetailRender.lua; 1.4.0-beta3: its caves, RetailCaves.lua)
         return
     end
     if cmd == "cavezoom" then
@@ -122,9 +129,9 @@ function Z:Slash(cmd, num, Print, arg)
         end
         local g = R:CaveZoom()
         if g then
-            Print(("caves show above world zoom %.2fx - or as deep as the zoom goes over a cave, where it stops short of that. /unroll cavezoom default = %.2fx, off = never"):format(g, R.CAVE_G))
+            Print(("caves show above world zoom %.2fx - or as deep as the zoom goes over a cave, where it stops short of that. %s cavezoom default = %.2fx, off = never"):format(g, ns.COMMAND, R.CAVE_G))
         else
-            Print(("caves never show. /unroll cavezoom default = world zoom %.2fx"):format(R.CAVE_G))
+            Print(("caves never show. %s cavezoom default = world zoom %.2fx"):format(ns.COMMAND, R.CAVE_G))
         end
         return
     end
@@ -137,10 +144,10 @@ function Z:Slash(cmd, num, Print, arg)
         end
         local g, zin, zout = R:CityZoom()
         if g then
-            Print(("city maps show above world zoom %.2fx, wherever the view is (hide below %.2fx). /unroll cityzoom default = %.2fx, off = 1.5x of each city's own zone"):format(
-                g, g * zout / zin, R.CITY_G))
+            Print(("city maps show above world zoom %.2fx, wherever the view is (hide below %.2fx). %s cityzoom default = %.2fx, off = 1.5x of each city's own zone"):format(
+                g, g * zout / zin, ns.COMMAND, R.CITY_G))
         else
-            Print(("city maps show at %.2fx of their own zone (the per-zone rule). /unroll cityzoom default = world zoom %.2fx"):format(zin, R.CITY_G))
+            Print(("city maps show at %.2fx of their own zone (the per-zone rule). %s cityzoom default = world zoom %.2fx"):format(zin, ns.COMMAND, R.CITY_G))
         end
         return
     end

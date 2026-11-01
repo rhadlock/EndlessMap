@@ -24,6 +24,9 @@ local function Deep()
     if not (e and e.mapType and e.mapType <= (ns.MAPTYPE_CONTINENT or 2)) then return false end
     local cam, v = core.Cam()
     if not (cam and v and v.W and v.H and v.W > 0 and v.H > 0 and cam.vw and cam.vw > 0) then return false end
+    -- (1.4.0, retail: RetailRender.lua) while a continent is drawn at its true shape over the world map's squeezed one
+    -- (the Eastern Kingdoms, Northrend, Khaz Algar), the world map's highlight of it would not fit the picture
+    if ns.Render and ns.Render.HighlightOff and ns.Render:HighlightOff(e.id) then return true end
     return ns.ZoomOf(v, e, cam.vw) > DEEP
 end
 

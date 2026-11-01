@@ -106,7 +106,7 @@ local function SetValue(pick) ns.Options:Set(pick.key, pick.value, true) end
 local function AddChoices(parent, key)
     local O = ns.Options
     local s = O:Spec(key)
-    if not (s and s.presets and parent.CreateButton) then return end
+    if not (s and s.presets and parent.CreateButton) or (s.avail and not s.avail()) then return end -- (1.4.0: avail - retail)
     local sub = parent:CreateButton(s.label)
     if not (sub and sub.CreateRadio) then return end
     local cur, def, found = O:Get(key), O:Default(key), false
@@ -128,7 +128,7 @@ end
 function M.Generator(_, root)
     local O = ns.Options
     if not (O and root and ns.db) then return end
-    if root.SetTag then root:SetTag("MENU_AZEROTH_UNROLLED") end
+    if root.SetTag then root:SetTag(ns.FLAVOR == "retail" and "MENU_ENDLESS_MAP" or "MENU_AZEROTH_UNROLLED") end -- ((1.4.0-beta4) the name by the game)
     if root.CreateTitle then root:CreateTitle(M:Title()) end
     for _, key in ipairs(TOGGLES) do AddToggle(root, key) end
     if root.CreateDivider then root:CreateDivider() end
@@ -374,7 +374,7 @@ function M:Apply()
     if ns.db.mapButton ~= false then
         Place()
         b:Show()
-        c:Show()
+        c:SetShown(ns.FLAVOR ~= "retail" or ns.RetailCaves ~= nil) -- (1.4.0: no caves on retail; 1.4.0-beta3: RetailCaves.lua's)
         l:SetShown(ns.MinimapLayer ~= nil and ns.MinimapLayer:Supported()) -- (1.3.0: WoW Forever only)
     else
         -- (an open menu closes by itself: Blizzard's menu follows its owner, Menu.lua:2504-2510)

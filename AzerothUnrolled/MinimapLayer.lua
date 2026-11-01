@@ -111,10 +111,11 @@ end
 ---------------------------------------------------------------------------
 -- Setup: the grids on the world map (ns.WorldPosToMap of two tiles' centres: each grid is affine on it)
 ---------------------------------------------------------------------------
-local isForever
+-- (1.4.0: ns.FLAVOR, OneCopy.lua) The game: WoW Forever - or, as before 1.4.0, another Classic game ("off"); never
+-- Classic Era or retail (before 1.4.0 the test was interface >= 16000, which let retail through: Forever's terrain there)
 function L:Supported()
-    if isForever == nil then isForever = ((select(4, GetBuildInfo())) or 0) >= 16000 end
-    return isForever and D ~= nil and D[0] ~= nil
+    local fl = ns.FLAVOR
+    return (fl == "forever" or fl == "off") and D ~= nil and D[0] ~= nil
 end
 function L:On() return ns.db ~= nil and ns.db.imagery == true and L:Supported() end
 function L:TilesOn() return ns.db ~= nil and ns.db.imageryTiles == true end -- (the client's own tiles: /unroll imagerytiles)

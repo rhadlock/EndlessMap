@@ -87,9 +87,9 @@ local S = {
 Doors.S = S
 Doors.HERE_OPENS_INSTANCE = HERE_OPENS_INSTANCE -- (Dungeon.lua reads it)
 
+-- (1.4.0: ns.FLAVOR, OneCopy.lua - before 1.4.0 the interface number here, 16000 - 19999) WoW Forever only
 local function Supported()
-    local build = (select(4, GetBuildInfo())) or 0
-    return build >= 16000 and build < 20000 and type(ns.FOREVER_DOORS) == "table" and type(ns.INSTANCES) == "table"
+    return ns.FLAVOR == "forever" and type(ns.FOREVER_DOORS) == "table" and type(ns.INSTANCES) == "table"
 end
 
 local function Plain(v) return v ~= nil and not (issecretvalue and issecretvalue(v)) end

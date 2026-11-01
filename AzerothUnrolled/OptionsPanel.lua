@@ -41,7 +41,7 @@ local function Register()
     for _, key in ipairs(TOGGLES) do
         local s = O:Spec(key)
         if s and not (s.avail and not s.avail()) then -- (1.3.0: avail - the imagery, WoW Forever only)
-            local setting = St.RegisterProxySetting(category, "AZEROTHUNROLLED_" .. key:upper(), St.VarType.Boolean, s.label,
+            local setting = St.RegisterProxySetting(category, ns.SLASH .. "_" .. key:upper(), St.VarType.Boolean, s.label,
                 O:Default(key) == true,
                 function() return O:Get(key) == true end,
                 function(value) O:Set(key, value and true or false, true) end)
@@ -52,7 +52,7 @@ local function Register()
     if St.CreateDropdown and St.CreateControlTextContainer then
         for _, key in ipairs(CHOICES) do
             local s = O:Spec(key)
-            if s and s.presets then
+            if s and s.presets and not (s.avail and not s.avail()) then -- (1.4.0: avail - retail)
                 local def = O:Default(key)
                 local function Options()
                     local container = St.CreateControlTextContainer()
@@ -64,7 +64,7 @@ local function Register()
                     if not found and cur ~= nil then container:Add(cur or NONE, PresetText(s, cur, "Custom", false)) end
                     return container:GetData()
                 end
-                local setting = St.RegisterProxySetting(category, "AZEROTHUNROLLED_" .. key:upper(), St.VarType.Number, s.label,
+                local setting = St.RegisterProxySetting(category, ns.SLASH .. "_" .. key:upper(), St.VarType.Number, s.label,
                     def or NONE,
                     function() return O:Get(key) or NONE end,
                     function(value)
@@ -90,4 +90,12 @@ end
 
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
-ev:SetScript("OnEvent", function() P:Setup() end)
+ev:SetScript("OnEvent", function(self, event)
+    -- (1.4.0, retail: a login in combat registers the page when the combat ends, as 1.4.0-beta0's page did)
+    if event == "PLAYER_LOGIN" and ns.FLAVOR == "retail" and InCombatLockdown and InCombatLockdown() then
+        self:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+    if event == "PLAYER_REGEN_ENABLED" then self:UnregisterEvent("PLAYER_REGEN_ENABLED") end
+    P:Setup()
+end)

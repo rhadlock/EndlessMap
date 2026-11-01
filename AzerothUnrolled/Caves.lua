@@ -1,5 +1,6 @@
 local _, ns = ...
 if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
+if ns.FLAVOR == "retail" then return end -- (1.4.0: ns.FLAVOR, OneCopy.lua) Forever's caves, never on retail
 
 -- Endless Map - the caves of the open world, drawn into the world map from the cave zoom (Render.CAVE_G by
 -- default, or the deepest zoom over a cave where less: Render.lua detail levels with gate "cave", Render:SetCaveZoom,

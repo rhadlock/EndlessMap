@@ -1,5 +1,58 @@
 # Changelog
 
+## Endless Map 1.4.0 - retail
+
+- **`/emap`** (1.4.0-beta4): a short form of `/endlessmap` on WoW Forever and Classic Era too; nothing else changes
+  there - the folder, the saved settings and `/unroll` stay.
+- **Retail is its own download** (1.4.0-beta4): the folder `EndlessMap`, the commands `/emap` and `/endlessmap`, its
+  own README and changelog. On retail the same zoom now looks the same wherever you drag - every map drawn as its land
+  only, no frame, margin, title or sea of a map fading in or out -, the small inset maps, starting areas and cities
+  come in cut to their own shapes, Vashj'ir is drawn in its own deep sea, the Eastern Kingdoms' north is
+  Quel'Thalas's own map as soon as the continent's is drawn, and Vashj'ir's sea floor is in the terrain imagery.
+- **Retail: WoW Forever's look** (1.4.0-beta3). Every zone of every continent and world is cut to its own land with soft
+  edges - no rectangles or parchment margins over the neighbours, no blurry strip round Orgrimmar -, the zones turn to
+  their detail together as you drag and zoom, a world fades softly into space at its edge and you can drag out into
+  space. Oribos, both Dalarans, Stormshield, Warspear and the other open-world cities are on the map, each with its own
+  map over its home as you close in.
+- **Retail: feature complete** (1.4.0-beta3). The minimap imagery (the real terrain, with the fog of war and the sub-zone
+  names; its button, `/emap imagery`), the caves and interiors (from world zoom 30; the caves button, `/emap
+  cavezoom`), the names of cities, dungeons and raids (with their level range) and flight masters, a click on a door's
+  name flies there and opens the dungeon's map, your icon on the door of the instance you are in, and the party bubbles:
+  click from one member to another, also in the middle of a flight. After an update, `/reload` loads the new files.
+- **Retail: cleaner still** (1.4.0-beta3). No continent frame or rectangle over space when you fling, drag or fly out of
+  a continent; the small inset maps fade into their boxes; zooming out of a zone changes nothing all at once; Oribos
+  comes in without the Shadowlands' giant tower round it; the big new cities at the same distance as the others; a door
+  click you overtake by scrolling or dragging opens nothing. The terrain imagery never hangs dark boxes into space, fades
+  softly at a world's edge and keeps the normal map if the game cannot load its pictures.
+- **Retail: the map is no longer black between space and the zones** (1.4.0-beta2). The pictures now load the way the
+  game loads its own map: each waits, invisible, until the game has loaded it, then fades in over the map under it -
+  space's map under the worlds, a world's under its continents, a continent's under its zones - and nothing fades out
+  before what replaces it is there. Blizzard's own map stays visible until the add-on's picture over it has loaded.
+- **Retail: zones from far out** (1.4.0-beta2). On Kalimdor, the Eastern Kingdoms and Quel'Thalas every zone's own
+  map shows, cut to its land, from about 5x (Quel'Thalas about 14.5x) - as on WoW Forever - instead of only the zone
+  you are over, close in. The map also loads more around the view and where you are heading.
+- **Retail: Blizzard's own map where it shows the view** (1.4.0-beta2). Wherever Blizzard's map already shows the view
+  - at rest, and while it follows a drag or a zoom - the add-on no longer lays its own, coarser pictures over it: no
+  blurry space map over Draenor, no fade-in over the right map when you open it. Worlds and continents load whole, so
+  zooming out shows no edges popping in; the zones' cut-outs no longer leave gaps between them (Orgrimmar's valley
+  included); and a zone's shape shows even if the game never says its mask has loaded.
+- **Retail World of Warcraft: the map** (1.4.0-beta1). Open the map in space, on Blizzard's map of the worlds, and
+  scroll: into any of the four worlds, any continent, through the small inset maps, down to the centre of any zone -
+  and back out, in one smooth zoom. Drag across borders, click a world or a zone (or use the quest log and the floor
+  list) and the map flies there; M opens it on your character, a click on your arrow follows you, the party bubbles
+  fly to your party. Pictures load as you go. Each picture fades in over about a third of a second, and wherever you
+  stop none is left half-faded: a continent shows with its own sea and frame (no longer Azeroth's drawing beside it),
+  a zone's own picture covers the view once you are inside it, the zone drawn is the one Blizzard's map shows, and
+  zooming back out to space ends without an empty strip. Names are added only where the map's own art does not print
+  them (Kalimdor and the Eastern Kingdoms).
+  Settings are on the map's round button and in Esc > Options > AddOns > Endless Map; WoW Forever's own options (city
+  maps, caves, minimap imagery, dungeon icons, flight masters) are left out on retail. After an update, `/reload`
+  loads the new files.
+- 1.4.0-beta0 was only a preview for retail: it checked that Endless Map loads there (a page in the AddOns settings
+  with the add-on's icon and a round picture), without changing the map.
+- **WoW Forever and Classic Era**: the same as 1.3.1. The add-on now notes quietly in its saved settings which of its
+  files the game loaded; nothing changes for you.
+
 ## Endless Map 1.3.1 (2026-10-18) - the new name
 
 - **Azeroth Unrolled is now called Endless Map.** It is the same add-on: the map, the settings, the buttons and every

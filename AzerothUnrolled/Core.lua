@@ -51,10 +51,14 @@ local DEFAULTS = {
     caveZoom = ns.Render.CAVE_G, -- (1.2.0) WORLD zoom from which the caves show (Caves.lua; /unroll cavezoom; false: never)
 }
 
+if ns.FLAVOR == "retail" then DEFAULTS.portals = true end -- ((1.4.0-beta14) the ways across the world: RetailPortals.lua)
+
 local IDLE_DELAY = 0.2      -- seconds without input before handing over
 local ZOOM_RATE = 14        -- how quickly the zoom catches up to the wheel
 local MOMENTUM_DECAY = 5
-local RELEASE_DELAY = 10    -- free texture memory this long after closing
+-- free texture memory this long after closing ((1.4.0-beta14) retail's a minute: closed and opened again within it, the map reloads
+-- nothing - the player's 1.4.0-beta13 session set 47,791 tiles for 17,649 textures; the client lets a hidden file go by itself)
+local RELEASE_DELAY = (ns.FLAVOR == "retail") and 60 or 10
 local LIVE_SWITCH_DELAY = 0.15 -- mid-motion, a better real map takes over once preferred this long
 local FOLLOW_RATE = 6          -- (1.1.0) how quickly the camera catches up with the unit it follows (Follow.lua)
 local FOLLOW_ZONE_CHECK = 0.5  -- (1.1.0) how often a followed view on a continent map looks for a zone map again
@@ -121,7 +125,7 @@ local Render, Labels
 -- Helpers
 ---------------------------------------------------------------------------
 local function UpdateView()
-    local world = ns.maps[ns.WORLD_MAP_ID]
+    local world = ns.maps[ns.ROOT_MAP_ID] -- (1.4.0: the top of the camera's space - on retail the Cosmic map, Util.lua)
     local w, h = container:GetSize()
     if not world or not w or w <= 0 or not h or h <= 0 then return false end
     v.W, v.H = w, h
@@ -162,6 +166,13 @@ local function NearestHoldable(c)
     local sx, sy, sd           -- the sticky one
     local function try(M)
         if not M or ns.ZoomOf(v, M, c.vw) < 1 - 1e-4 then return end
+        -- (1.4.0, retail: RetailSpace.lua) a map that bounds the camera only up to a zoom - the Cosmic map, up to the
+        -- largest world's fit: deeper, the view stays on a world (1.4.0-beta1: M.holdAt - that zoom for this view: the
+        -- Cosmic map's by the world under it, an inset's only on its link's rect). (1.4.0-beta3, retail: M.boundsAll -
+        -- the Cosmic map bounds the camera at every zoom, as WoW Forever's root, Azeroth, does: a drag goes on past a
+        -- world's edge into space - the player on 1.4.0-beta2: "i cant drag out, feels bad"; its canvas still shows a
+        -- view only up to holdMax, Holds. Nil on WoW Forever)
+        if M.holdMax and not M.boundsAll and ns.ZoomOf(v, M, c.vw) > (M.holdAt and M.holdAt(M, c, v) or M.holdMax) then return end
         local s = (M.x1 - M.x0) * ppx / M.lw
         local xOff = math.min((v.W / 2) / (s * M.lw), 0.5)
         local yOff = math.min((v.H / 2) / (s * M.lh), 0.5)
@@ -173,9 +184,15 @@ local function NearestHoldable(c)
         if d < 0.5 and not zid then zx, zy, zid = x, y, M.id end
         if not bd or d < bd then bx, by, bd, bid = x, y, d, M.id end
     end
-    try(ns.maps[ns.WORLD_MAP_ID])
-    for _, e in ipairs(ns.drawList) do
-        if e.mapType == ns.MAPTYPE_CONTINENT then try(e) end
+    if ns.holders then
+        -- (1.4.0, retail: RetailSpace.lua) the maps that bound the camera: the Cosmic map, the worlds, continents,
+        -- insets and portals, and the zones that reach past their parent's picture
+        for _, M in ipairs(ns.holders) do try(M) end
+    else
+        try(ns.maps[ns.WORLD_MAP_ID])
+        for _, e in ipairs(ns.drawList) do
+            if e.mapType == ns.MAPTYPE_CONTINENT then try(e) end
+        end
     end
 
     local x, y, id
@@ -204,6 +221,14 @@ local function ClampCam(c, dt, zooming, prevX, prevY, panning, follow)
     if c.vw > 1 then c.vw = 1 end
     local x, y, changed = NearestHoldable(c)
     if changed then gliding = true end
+    if ns.holders and lastHolderID == ns.ROOT_MAP_ID then
+        -- (1.4.0-beta1, retail: the reviews of 1.4.0-beta1) the Cosmic map bounds the view: nothing is drawn beyond it, so
+        -- a glide back would leave a blank strip at its edge (zoomed out from the Shadowlands' Bastion, up to 12% of the
+        -- view for a second) - the view keeps to it at once, as at any edge outside a zoom
+        c.x, c.y = x, y
+        gliding = false
+        return x, y
+    end
     if follow and gliding then
         -- (1.3.0, following: no glide onto a view the bounding map shows as it is - the unit goes to the centre as soon
         -- as a map can show it there; a glide would trail it, and the zoom magnifies what trails)
@@ -271,6 +296,8 @@ local function UpdateCanvasAlpha()
     local child = container.Child
     if not child then return end
     local want = (overlayMoving and overlay:IsShown() and Render:IsReady()) and 0 or 1
+    -- (1.4.0-beta2, retail: /unroll test canvas - RetailWhy.lua - never hides the canvas, this session; nil on WoW Forever)
+    if ns.retailTest and ns.retailTest.canvas then want = 1 end
     if child:GetAlpha() ~= want then child:SetAlpha(want) end
 end
 
@@ -301,6 +328,7 @@ local function HostLayers(detached)
         if f:GetParent() ~= host then
             f:SetParent(host)
             f.level = nil -- (reparenting re-levels the frame: set it again)
+            if ns.Perf then ns.Perf.Flip() end
         end
     end
     FitLayers()
@@ -346,7 +374,11 @@ local function SetOverlayMode(moving)
         ns.SetLevelFixed(labelLayer, labelLevel)
         labelLayer.level = labelLevel
     end
-    if catcher:IsShown() ~= moving then catcher:SetShown(moving) end
+    -- (1.4.0-beta2, retail - the review of the real client, point 9: a hold that is live - Blizzard's map on the view, its
+    -- pins in place, nothing sliding under the cursor - leaves the pins the mouse as at rest; on WoW Forever a hold is
+    -- never live)
+    local catch = moving and not (live and state == "hold")
+    if catcher:IsShown() ~= catch then catcher:SetShown(catch) end
 
     overlayMoving = detached
     UpdateCanvasAlpha()
@@ -372,8 +404,14 @@ end
 
 -- Can Blizzard's canvas for map M show camera c exactly? (zoom at least the
 -- map's fit, and the view inside the map the way Blizzard clamps scrolling)
-local function Holds(M, c)
+-- (1.4.0-beta2, retail) canvas: whether its canvas CAN show it - M.holdAt left out, M.holdMax kept (docs/retail-engine.md
+-- 11.3, CanvasShows: InstantPanAndZoom takes any scale, the cap is ours); on WoW Forever no map has holdAt: the same
+local function Holds(M, c, canvas)
     if ns.ZoomOf(v, M, c.vw) < 1 - 1e-4 then return false end
+    -- (1.4.0, retail: RetailSpace.lua) the Cosmic map shows a view only up to its holdMax (the fit of the deepest map that
+    -- reaches past its world's picture) - deeper, its canvas (and its pins) would grow without end over open space; a
+    -- world or a map under it takes the view there (1.4.0-beta1: M.holdAt - that zoom for this view)
+    if M.holdMax and ns.ZoomOf(v, M, c.vw) > ((M.holdAt and not canvas) and M.holdAt(M, c, v) or M.holdMax) then return false end
     local s, P, Q = RealParams(M, c)
     local xOff, yOff = (v.W / 2) / (s * M.lw), (v.H / 2) / (s * M.lh)
     local tx, ty = 0.5 / (s * M.lw), 0.5 / (s * M.lh) -- half a pixel
@@ -394,6 +432,7 @@ end
 -- inside the map), mirroring Blizzard's CalculateScrollExtentsAtScale.
 local function ClampToMap(M, c)
     if ns.ZoomOf(v, M, c.vw) < 1 then c.vw = ns.WidthForZoom(v, M, 1) end
+    if M.holdMax and ns.ZoomOf(v, M, c.vw) > M.holdMax then c.vw = ns.WidthForZoom(v, M, M.holdMax) end -- (1.4.0, retail)
     local s, P, Q = RealParams(M, c)
     local xOff = math.min((v.W / 2) / (s * M.lw), 0.5)
     local yOff = math.min((v.H / 2) / (s * M.lh), 0.5)
@@ -435,11 +474,21 @@ local function DiffersFromCam(r)
         or math.abs(r.vw / cam.vw - 1) > 0.001
 end
 
+-- ((1.4.0-beta15, retail: RetailBench.lua) a map switch's time, in the player's client)
+local function SwitchMap(id)
+    local perf = ns.Perf
+    if not perf then return WorldMapFrame:SetMapID(id) end
+    local p0 = debugprofilestop()
+    WorldMapFrame:SetMapID(id)
+    perf.Add("setMap", debugprofilestop() - p0)
+    perf.Map()
+end
+
 local function SyncReal(M)
     syncing = true
     local ok, err = pcall(function()
         if WorldMapFrame:GetMapID() ~= M.id then
-            WorldMapFrame:SetMapID(M.id)
+            SwitchMap(M.id)
         end
         SetRealView(RealParams(M, cam))
     end)
@@ -501,6 +550,9 @@ local function QuestSafe(id)
     if sq and sq ~= 0 and QL.GetNextWaypointForMap and QL.GetNextWaypointForMap(sq, id) and not Cached(sq) then
         return false
     end
+    -- (1.4.0, retail: RetailSpace.lua) the map's task quests too - world quests and bonus objectives style their pins
+    -- from the same cache (POIButtonMixin:GetQuestClassification -> QuestCache:Get)
+    if ns.QuestSafeExtra and not ns.QuestSafeExtra(id, Cached) then return false end
     questSafeOK[id] = true
     return true
 end
@@ -514,7 +566,9 @@ local function ChooseHandover(c, ok)
     local best, bestScore
     for _, e in ipairs(ns.drawList) do
         if Holds(e, c) and (not ok or ok(e.id)) then
-            local score = ((e.mapType == ns.MAPTYPE_ZONE) and 100000 or 0)
+            -- (1.4.0, retail: e.hscore, RetailSpace.lua - by the depth in the placement tree, an inset over the zones
+            -- beside it; the integer terms come first, so on WoW Forever the sum is the same to the bit)
+            local score = (e.hscore or ((e.mapType == ns.MAPTYPE_ZONE) and 100000 or 0))
                 + ((e.id == focus or e.id == contFocus) and 10000 or 0)
                 + e.nest * 1000
                 + ((e.id == realID) and 100 or 0)
@@ -523,7 +577,7 @@ local function ChooseHandover(c, ok)
         end
     end
     if best then return best end
-    local world = ns.maps[ns.WORLD_MAP_ID]
+    local world = ns.maps[ns.ROOT_MAP_ID] -- (1.4.0: the top map - on retail the Cosmic map)
     if world and Holds(world, c) and (not ok or ok(world.id)) then return world end
 end
 
@@ -572,14 +626,59 @@ local function LiveProbe()
 end
 
 local function LiveMap(now)
-    local cur = ns.GetMap(WorldMapFrame:GetMapID())
+    local real = ns.GetMap(WorldMapFrame:GetMapID())
+    local cur = real
     if cur and not Holds(cur, cam) then cur = nil end
+    -- (1.4.0-beta2, retail: docs/retail-engine.md 11.3 (4)) out of combat, where no map we may switch to can show the view,
+    -- the current map stays live while its canvas can show it (Holds' canvas: the Cosmic map past a world's fit, under
+    -- our pictures) - in game at 1.11x over Draenor QuestSafe kept Blizzard's map on the Cosmic map and its canvas was
+    -- hidden under pictures that did not draw. On WoW Forever Holds(real, cam, true) is Holds(real, cam): nil, as before.
+    local keep = (real and not cur and not InCombatLockdown() and Holds(real, cam, true)) and real or nil
     -- (1.3.0: nor on the add-on's own flights to a view it picked, StartAimed - their landing switches once, BeginSettle.
     -- Live, a bubble's flight from Elwynn Forest to Durotar went over the world's and Kalimdor's maps: three SetMapID,
     -- each reloading every pin in mid-flight, where the jump before it made one.)
     if (fly and (fly.external or fly.aimed)) or InCombatLockdown() then
         livePrefID = nil
-        return cur
+        return cur or keep
+    end
+    -- ((1.4.0-beta15, retail) Blizzard's map switches where the motion ends, once - BeginSettle -, never on the way, every motion as a flight: a switch runs every one
+    -- of its 40-odd data providers over the map and acquires all its pins, in one frame, in the middle of a zoom - on a wheel from space to a zone four of them. Its
+    -- canvas follows while the map it is on can show the view; past that our layers go on alone, its pins back at the rest. /emap test livemap: as 1.4.0-beta14)
+    if ns.SpaceFocus and not (ns.retailTest and ns.retailTest.livemap) then
+        livePrefID = nil
+        if drag.active then
+            -- (once its canvas has let go in a stroke it stays off to the release: never hidden and shown again - F8, below)
+            if drag.liveOff then return nil end
+            if cur or keep then return cur or keep end
+            drag.liveOff = true
+            return nil
+        end
+        return cur or keep
+    end
+    if ns.SpaceFocus and drag.active then
+        -- (1.4.0-beta3, retail - WoW Forever parity, F8: Blizzard's map changes at most once in a stroke, never back) A
+        -- drag keeps Blizzard's map while it can show the view; where it cannot, it goes once - to the nearest map above it
+        -- that can (a zone's continent holds the view across its zones), else the best -, and after that, where the map
+        -- it went to cannot show the view either, the stroke goes on detached: our pictures alone, Blizzard's canvas and
+        -- pins back at the release (the settle). 1.4.0-beta2 at Azeroth's edge, dragging and zooming: 947 -> 946 -> 947
+        -- -> 946 -> 947 in 0.6 s, the canvas hidden and shown, each SetMapID reloading the pins and the detail layer.
+        livePrefID = nil
+        if drag.liveOff then return nil end
+        if cur then return cur end
+        if (drag.liveN or 0) < 1 then
+            local p, guard = real and ((real.home and ns.maps[real.home]) or real.pe), 0
+            while p and guard < 8 do
+                if Holds(p, cam) and QuestSafe(p.id) then break end
+                p, guard = (p.home and ns.maps[p.home]) or p.pe, guard + 1
+            end
+            p = p or ChooseHandover(cam, QuestSafe) or keep
+            if p then
+                if p ~= real then drag.liveN = (drag.liveN or 0) + 1 end
+                return p
+            end
+        end
+        drag.liveOff = true
+        return nil
     end
     local best = ChooseHandover(cam, QuestSafe) -- (1.1.1: a map we may switch to)
     -- (1.0.0) A map the motion only passes through does not take over: every SetMapID reloads the pins.
@@ -605,7 +704,7 @@ local function LiveMap(now)
     end
     if not cur or not best or best == cur then
         livePrefID = nil
-        return cur or best
+        return cur or best or keep
     end
     if livePrefID ~= best.id then livePrefID, livePrefT = best.id, now end
     -- (1.0.0: and, zooming at a city, not while the wheel is still being spun - the zoom's target moves with every
@@ -619,7 +718,7 @@ end
 
 local liveMap
 local function LiveSyncCall()
-    if WorldMapFrame:GetMapID() ~= liveMap.id then WorldMapFrame:SetMapID(liveMap.id) end
+    if WorldMapFrame:GetMapID() ~= liveMap.id then SwitchMap(liveMap.id) end
     SetRealView(RealParams(liveMap, cam))
 end
 
@@ -633,7 +732,9 @@ local function LiveSync(M)
         or P ~= container:GetCurrentScrollX() or Q ~= container:GetCurrentScrollY() then
         liveMap = M
         syncing = true
+        local p0 = ns.Perf and debugprofilestop()
         local ok, err = pcall(LiveSyncCall)
+        if p0 then ns.Perf.Add("sync", debugprofilestop() - p0) end
         syncing = false
         liveMap = nil
         if not ok then
@@ -654,7 +755,9 @@ end
 -- is hidden and our layers go above it until the view settles.
 local function SyncMoving()
     local now = GetTime()
-    live = (db.livePins ~= false and fourArgPanZoom and not translucent and state ~= "hold"
+    -- (1.4.0-beta2, retail: a hold out of combat is live on the current map while its canvas can show the view - LiveMap)
+    live = (db.livePins ~= false and not (ns.retailTest and ns.retailTest.nolive) and fourArgPanZoom and not translucent
+        and (state ~= "hold" or (ns.SpaceFocus ~= nil and not InCombatLockdown()))
         and LiveSync(LiveMap(now))) or false
     liveT = now
     if live and fly then fly.liveUsed = true end
@@ -975,8 +1078,14 @@ local function UpdateFocus(now, force)
     if not force and now - focusCheckT < 0.08 then return end
     focusCheckT = now
     local fx, fy = ZoomDestination()
-    local contID = ContinentAt(fx, fy)
-    local zoneID = FocusZoneAt(fx, fy, contID or Render:GetContinentFocus())
+    local contID, zoneID
+    if ns.SpaceFocus then
+        -- (1.4.0, retail: RetailSpace.lua) down the placement tree from the Cosmic map
+        contID, zoneID = ns.SpaceFocus(fx, fy, nil, cam, v)
+    else
+        contID = ContinentAt(fx, fy)
+        zoneID = FocusZoneAt(fx, fy, contID or Render:GetContinentFocus())
+    end
     if contID ~= lastContAt then
         lastContAt = contID
         Render:SetContinentFocus(contID)
@@ -991,6 +1100,14 @@ end
 -- on top, like Blizzard's own view of it.
 local function FocusRealMap()
     local M = ns.GetMap(WorldMapFrame:GetMapID())
+    if ns.SpaceFocus then
+        -- (1.4.0, retail: RetailSpace.lua) the real map and the chain above it go on top
+        local c, z = ns.SpaceFocus(cam.x, cam.y, M and M.id, cam, v)
+        lastContAt, lastZoneAt = c, z
+        Render:SetContinentFocus(c)
+        Render:SetFocus(z)
+        return
+    end
     local contID = ContinentAt(cam.x, cam.y)
     lastContAt = contID
     lastZoneAt = FocusZoneAt(cam.x, cam.y, contID or Render:GetContinentFocus())
@@ -1014,13 +1131,25 @@ local function Moving()
 end
 
 -- Returns true while art is still loading / fading in.
+-- ((1.4.0-beta16) or something drawn asked for another draw - Redraw from inside this one, Labels.lua's markers beyond a frame's few: the caller's restBusy = DrawFrame() and its
+-- driver:Hide() threw the request away, and those markers stayed missing until the next move)
+local drawing, redrawAsked = false, false
 local function DrawFrame()
     local busy = false
+    drawing = true
     if Moving() then SyncMoving() end
-    -- Zooming in: build the zone art where the zoom is heading ahead of time.
-    if state == "free" and targetVw < cam.vw then
+    -- Zooming in: build the zone art where the zoom is heading ahead of time. (1.4.0-beta2, retail: RetailRender.lua's
+    -- PREFETCH_OUT - zooming out too, the drawn pictures' windows grown to the view it heads for; nil on WoW Forever)
+    if state == "free" and (targetVw < cam.vw or (Render.PREFETCH_OUT and targetVw > cam.vw * 1.0001)) then
         local tx, ty = ZoomDestination()
         Render:SetPrefetch(tx, ty, targetVw)
+    elseif state == "fly" and fly and Render.PREFETCH_FLIGHTS then
+        -- (1.4.0, retail: RetailRender.lua) a flight loads ahead the pictures of the view it lands on
+        Render:SetPrefetch(fly.target.x, fly.target.y, fly.target.vw)
+    elseif state == "free" and Render.PREFETCH_PAN and PanAhead() then
+        -- (1.4.0-beta2, retail: RetailRender.lua) a drag or a glide loads ahead the view it heads for
+        local p = PanAhead()
+        Render:SetPrefetch(p.x, p.y, p.vw)
     else
         Render:SetPrefetch(nil)
     end
@@ -1028,9 +1157,16 @@ local function DrawFrame()
     UpdateCanvasAlpha()
     if db.labels and state ~= "off" and (Moving() or db.labelsAtRest) then
         labelLayer:Show()
+        local p0 = ns.Perf and debugprofilestop()
         Labels:Draw(cam, v)
+        if p0 then ns.Perf.Add("labels", debugprofilestop() - p0) end
     else
         Labels:HideAll()
+    end
+    drawing = false
+    if redrawAsked then
+        redrawAsked = false
+        busy = true
     end
     return busy
 end
@@ -1179,6 +1315,9 @@ local function StartFly(target, onDone, external, aimed)
         path = NestedPath(x0, y0, w0, x1, y1, w1, S) or path
     end
     local dur = ns.Clamp(0.3 + S * 0.22, 0.3, 1.5)
+    -- (1.4.0, retail: RetailSpace.lua) from space to a zone the zoom spans up to 1,700x: no faster than 1.25x a frame at the
+    -- ease's steepest (0.35 s per unit of path, up to 2 s)
+    if ns.SpaceFocus then dur = math.max(dur, math.min(S * 0.35, 2)) end
     dur = dur / ((db.flySpeed and db.flySpeed > 0) and db.flySpeed or 1)
     fly = { S = S, path = path, t = 0, dur = dur, target = target, onDone = onDone,
         external = external, lockFocus = external, aimed = aimed }
@@ -1206,6 +1345,15 @@ BeginSettle = function()
         local x, y = NearestHoldable(cam)
         local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
         if math.abs(x - cam.x) * ppx + math.abs(y - cam.y) * ppy < 0.01 then
+            -- (1.4.0-beta3, retail: the Cosmic map bounds the camera at every zoom - RetailSpace.lua boundsAll -, so a view
+            -- dragged past a world's edge into space, deeper than any canvas can show, is where it may rest: held, our
+            -- pictures over Blizzard's hidden canvas - never a snap onto Azeroth's map, which cannot show it. On WoW
+            -- Forever the root is the world: as before)
+            local root = ns.maps[ns.ROOT_MAP_ID]
+            if root and root.boundsAll and ns.ROOT_MAP_ID ~= ns.WORLD_MAP_ID then
+                EnterHold()
+                return
+            end
             M = ns.maps[ns.WORLD_MAP_ID] -- numerically on the edge; take the world
         else
             StartFly({ x = x, y = y, vw = cam.vw }, BeginSettle)
@@ -1239,7 +1387,11 @@ BeginSettle = function()
         end
     end
     SyncReal(M)
-    EnterRest(true)
+    -- (1.4.0-beta1, retail: the reviews of 1.4.0-beta1) the focus follows the map the settle shows: moving, the focus
+    -- goes by the point under the camera (RetailSpace.lua SpaceFocus) and the hand-over by the maps that can show the
+    -- whole view, so at rest a zone's picture could be drawn over Blizzard's map of its neighbour (Durotar's over the
+    -- Southern Barrens)
+    EnterRest(not ns.SpaceFocus)
 end
 
 ---------------------------------------------------------------------------
@@ -1303,7 +1455,20 @@ end
 -- current map (no map switch, BeginSettle's rule). nil: no map.
 local function FlightTarget(x, y, vw)
     local t = { x = x, y = y, vw = vw }
-    local M = (not InCombatLockdown() and ChooseHandover(t, QuestSafe)) or ns.GetMap(WorldMapFrame:GetMapID())
+    local combat = InCombatLockdown()
+    local M = (not combat and ChooseHandover(t, QuestSafe)) or (combat and ns.GetMap(WorldMapFrame:GetMapID())) or nil
+    if not M and not combat then
+        -- ((1.4.0-beta12, retail: the Cosmic map bounds the camera - RetailSpace.lua boundsAll - and a held view answers the
+        -- mouse) no map we may switch to can show the view: the view itself, held at the landing - never pressed into
+        -- Blizzard's map of the moment. The player's 1.4.0-beta11 session, every map refused: Blizzard's map the Cosmic
+        -- map, a click on your bubble "only zooms out and centers, never zooms back in" (the landing pressed into the
+        -- Cosmic map's own depth); a click's flight to Redridge landed on Elwynn Forest's edge. Not into the Cosmic map
+        -- either - its canvas shows no view that deep (holdMax). On WoW Forever, as before: on the current map, the view
+        -- kept inside it.)
+        local root = ns.maps[ns.ROOT_MAP_ID]
+        if root and root.boundsAll and ns.ROOT_MAP_ID ~= ns.WORLD_MAP_ID then return t end
+        M = ns.GetMap(WorldMapFrame:GetMapID())
+    end
     if not M then return nil end
     if not Holds(M, t) then ClampToMap(M, t) end
     return t
@@ -1345,10 +1510,17 @@ end
 -- along the edge with the unit's motion as before: a pixel or two a frame.) held: no map keeps the view inside it -
 -- FollowHeld's (over our overlay), a wheel zoom's (UpdateFree: ClampCam's bounds only). true: a flight started.
 local function FollowFar(tx, ty, held)
-    local t = { x = tx, y = ty, vw = cam.vw }
+    -- (1.4.0, retail: RetailParty.lua VwLike - nil on WoW Forever) as wide in yards as the view now: through a portal to
+    -- another world one width of the camera is another width in yards
+    local yv = ns.VwLike and ns.VwLike(tx, ty, cam.vw)
+    local t = { x = tx, y = ty, vw = yv or cam.vw }
     local cur = ns.GetMap(WorldMapFrame:GetMapID())
+    if yv and not held and not ((cur and Holds(cur, t)) or (not InCombatLockdown() and ChooseHandover(t, QuestSafe))) then
+        t.vw = cam.vw -- (1.4.0: no map we may show can show that width there: the view's own, as before)
+    end
     if not held and not ((cur and Holds(cur, t)) or (not InCombatLockdown() and ChooseHandover(t, QuestSafe))) then
         if not cur then return false end
+        t.vw = cam.vw -- (1.4.0: kept inside the map shown - in combat - the view keeps its width, as before)
         ClampToMap(cur, t)
     end
     local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
@@ -1365,8 +1537,23 @@ local function FollowFarFree(fx, fy)
     local ex, ey = (fx - cam.x) * ppx, (fy - cam.y) * ppy
     if ex * ex + ey * ey <= 4 * (v.W * v.W + v.H * v.H) then return false end
     local w = math.min(targetVw, 1)
-    if w < cam.vw then w = math.max(w, math.min(ns.WidthForZoom(v, DeepestAt(fx, fy), db.maxZoom), cam.vw)) end
+    if w < cam.vw then
+        local D = DeepestAt(fx, fy)
+        w = math.max(w, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), cam.vw)) -- (1.4.0: D.maxZoom, retail)
+    end
+    local vw0 = cam.vw
     if not FollowFar(fx, fy, true) then return false end
+    if ns.VwLike then
+        -- (1.4.0, retail: RetailParty.lua) the wheel's zoom on a landing as wide in yards as the view (FollowFar), no
+        -- deeper than the wheel may go there
+        local L = math.min(fly.target.vw * w / vw0, 1)
+        if L < fly.target.vw then
+            local D = DeepestAt(fx, fy)
+            L = math.max(L, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), fly.target.vw))
+        end
+        fly.zoomF = L / fly.target.vw
+        return true
+    end
     fly.zoomF = w / fly.target.vw
     return true
 end
@@ -1459,8 +1646,15 @@ local function UpdateFree(dt, now)
         lastHolderID = new
     end
     if anchor then
-        -- Keep the zoom anchored to the cursor from wherever the clamp put us.
-        anchor.wx, anchor.wy = ScreenToWorldWith(cam, anchor.sx, anchor.sy)
+        if anchor.held and not fx and not drag.active then
+            -- (1.4.0-beta1, retail: OnMouseWheel's held) zooming in, the zoom keeps heading for the point aimed at: a
+            -- clamp at a world's edge moves it on screen instead of handing the zoom to whatever slid under the cursor
+            local hpx, hpy = ns.PixelsPerUnit(v, cam.vw)
+            anchor.sx, anchor.sy = v.W / 2 + (anchor.wx - cam.x) * hpx, v.H / 2 + (anchor.wy - cam.y) * hpy
+        else
+            -- Keep the zoom anchored to the cursor from wherever the clamp put us.
+            anchor.wx, anchor.wy = ScreenToWorldWith(cam, anchor.sx, anchor.sy)
+        end
         -- (kept on a city and zooming in: the aim stays, see CityZoom)
         if not (depthCity and targetVw <= cam.vw) then -- (the aim also outlives a finished notch)
             anchor.ax, anchor.ay, anchor.asx, anchor.asy = anchor.wx, anchor.wy, anchor.sx, anchor.sy
@@ -1499,7 +1693,13 @@ local function UpdateFly(dt, now)
             -- finish the crossfade just before the flight lands
             Render:SetFadeTime(math.max(0.06, (f.dur - f.t) * 0.85))
             local M = f.target.map
-            if M and M.mapType == ns.MAPTYPE_ZONE then
+            if M and ns.SpaceFocus then
+                -- (1.4.0, retail: RetailSpace.lua) the map flown to and the chain above it - a world, an inset or a
+                -- zone of Outland as well as a continent's zone
+                local c, z = ns.SpaceFocus(f.target.x, f.target.y, M.id, f.target, v)
+                Render:SetFocus(z)
+                Render:SetContinentFocus(c)
+            elseif M and M.mapType == ns.MAPTYPE_ZONE then
                 Render:SetFocus(M.id)
                 Render:SetContinentFocus(WalkUpTo(M.parent, ns.MAPTYPE_CONTINENT))
             elseif M and M.mapType == ns.MAPTYPE_CONTINENT then
@@ -1600,6 +1800,7 @@ local function OnUpdate(_, dt)
                 end
                 EnterFree()
                 drag.active = true
+                drag.liveN, drag.liveOff = 0, false -- (1.4.0-beta3, retail: a new stroke - LiveMap)
                 drag.swallow = true
                 if ns.Follow then ns.Follow:Stop() end -- (1.1.0: a drag takes the map back)
                 drag.wx, drag.wy = drag.gx, drag.gy
@@ -1651,14 +1852,63 @@ local function WheelInFlight(f, delta)
     local w0 = f.target.vw * f.zoomF
     local w = w0 / (db.zoomStep ^ delta)
     if delta > 0 then
-        w = math.max(w, math.min(ns.WidthForZoom(v, DeepestAt(f.target.x, f.target.y), db.maxZoom), w0))
+        local D = DeepestAt(f.target.x, f.target.y)
+        w = math.max(w, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), w0)) -- (1.4.0: D.maxZoom, retail)
     end
     f.zoomF = math.min(w, 1) / f.target.vw
     lastInput = GetTime()
     lastWheel = lastInput
 end
 
+-- ((1.4.0-beta13, retail: RetailDoors.lua) A door's click: the view it was clicked at, for the way back; chain: the maps above
+-- the door's. Back out of the door's map - Blizzard's right click to a map of the chain, the wheel out past its least zoom -
+-- that view shows again, at once, as WoW Forever's dungeon view lies over a world map that never moved: the player on
+-- 1.4.0-beta12, "right clicking to go back to world does not put your back to the same view you had before entering the
+-- dungion". true: done.
+local doorReturn
+local function SetDoorReturn(home, dm)
+    local chain, id, guard = {}, dm, 0
+    while id and id ~= 0 and guard < 8 do
+        local ok, info = pcall(C_Map.GetMapInfo, id)
+        id = ok and type(info) == "table" and info.parentMapID
+        if id then chain[id] = true end
+        guard = guard + 1
+    end
+    doorReturn = { home = home, chain = chain }
+end
+local function BackFromDoor(mapID)
+    local r = doorReturn
+    doorReturn = nil
+    if not (r and r.home and (not mapID or r.chain[mapID])) then return false end
+    return JumpToZoom(r.home.x, r.home.y, ns.WorldZoom(v, r.home.vw))
+end
+
+-- ((1.4.0-beta12, retail: ns.SpaceAncestor) The add-on standing aside on Blizzard's map of a map it does not draw (a
+-- dungeon - M inside an instance), that map zoomed out as far as Blizzard's goes: the zoom out goes on in the add-on's map,
+-- from the nearest map above it the add-on draws, whole (the player on 1.4.0-beta11: "if i hit m while in an instance,
+-- zooming out will not go back to world"); where no map we may switch to shows that view, held there. true: done.
+local function LeaveOff()
+    if not (ns.SpaceAncestor and ready and db.enabled and WorldMapFrame:IsShown() and UpdateView()) then return false end
+    if doorReturn and BackFromDoor() then return true end
+    local A = ns.SpaceAncestor(WorldMapFrame:GetMapID())
+    local world = ns.maps[ns.WORLD_MAP_ID]
+    if not (A and world) then return false end
+    local w = ns.WidthForZoom(v, A, 1)
+    if JumpToZoom(A.cx, A.cy, ns.WorldZoom(v, w)) then return true end
+    cam.x, cam.y, cam.vw = A.cx, A.cy, w
+    fly, anchor, restAim = nil, nil, nil
+    vel.x, vel.y = 0, 0
+    overlay:Show()
+    SetBlizzardWheel(true)
+    EnterHold()
+    return true
+end
+
 local function OnMouseWheel(_, delta)
+    if state == "off" and delta < 0 and ns.SpaceAncestor and container.IsAtMinZoom and container:IsAtMinZoom() then
+        LeaveOff()
+        return
+    end
     if not Usable() or delta == 0 then return end
     if state == "fly" and fly and fly.aimed and ns.Follow and ns.Follow:Active() then
         WheelInFlight(fly, delta)
@@ -1684,7 +1934,8 @@ local function OnMouseWheel(_, delta)
             -- from Eastern Kingdoms' whole view the world's nearest view of you lies elsewhere - zoomed about that, the
             -- view first went away from you)
             local R = ns.GetMap(WorldMapFrame:GetMapID())
-            if R and (R.id == ns.WORLD_MAP_ID or R.mapType == ns.MAPTYPE_CONTINENT) then lastHolderID = R.id end
+            -- (1.4.0, retail: R.holder - every map that bounds the camera, RetailSpace.lua)
+            if R and (R.id == ns.WORLD_MAP_ID or R.mapType == ns.MAPTYPE_CONTINENT or R.holder) then lastHolderID = R.id end
         end
         local q = { x = fx - (fdx or 0), y = fy - (fdy or 0), vw = cam.vw } -- (where it was when the camera last moved)
         local keep = lastHolderID
@@ -1699,8 +1950,19 @@ local function OnMouseWheel(_, delta)
     else
         local wx, wy = ScreenToWorldWith(cam, sx, sy)
         if fx then wx, wy = fx, fy end
+        -- (1.4.0-beta1, retail) a notch in with the cursor where the last one was taken: the zoom goes on toward that
+        -- notch's point, wherever a clamp at a world's edge has moved it on screen (UpdateFree) - zoomed in at a place
+        -- near Azeroth's edge from space, the place no longer slides away from the zoom
+        local held = ns.holders and delta > 0 and not fx and not depthCity
+        local hx, hy, cx0, cy0 = sx, sy, sx, sy
+        if held and prev and prev.held and prev.cx and (sx - prev.cx) ^ 2 + (sy - prev.cy) ^ 2 <= dragThreshold * dragThreshold then
+            local hpx, hpy = ns.PixelsPerUnit(v, cam.vw)
+            wx, wy, cx0, cy0 = prev.wx, prev.wy, prev.cx, prev.cy
+            hx, hy = v.W / 2 + (wx - cam.x) * hpx, v.H / 2 + (wy - cam.y) * hpy
+        end
         points[3], points[4] = wx, wy
-        anchor = { wx = wx, wy = wy, sx = sx, sy = sy, ax = wx, ay = wy, asx = sx, asy = sy }
+        anchor = { wx = wx, wy = wy, sx = hx, sy = hy, ax = wx, ay = wy, asx = hx, asy = hy }
+        if held then anchor.held, anchor.cx, anchor.cy = true, cx0, cy0 end
         if delta > 0 and depthCity and prev and prev.asx
             and (sx - prev.asx) ^ 2 + (sy - prev.asy) ^ 2 <= dragThreshold * dragThreshold then
             -- Another notch in while kept on a city, the cursor still (less
@@ -1718,7 +1980,9 @@ local function OnMouseWheel(_, delta)
         -- centre). Only ever stops further zooming in, never pushes you out.
         local floor = math.huge
         for i = 1, #points, 2 do
-            floor = math.min(floor, ns.WidthForZoom(v, DeepestAt(points[i], points[i + 1]), db.maxZoom))
+            -- (1.4.0, retail: a map's own limit - the Cosmic map's over open space, RetailSpace.lua)
+            local D = DeepestAt(points[i], points[i + 1])
+            floor = math.min(floor, ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom))
         end
         newT = math.max(newT, math.min(floor, targetVw))
         -- (deeper than a capital's zone goes: the view is kept on the city - not while following, 1.3.0)
@@ -1731,7 +1995,20 @@ local function OnMouseWheel(_, delta)
     UpdateFocus(lastInput, true)
 end
 
+-- (1.4.0-beta12) A press on our catcher while the map holds (Blizzard's map cannot show the view; its canvas, on another
+-- map, lies hidden under the catcher): its release, when no drag came of it, is a click on the map - ours (OurClick).
+-- (The player's 1.4.0-beta11 session held at every view - no door, city, quest or zone answered a click: a hold is no
+-- motion, only Blizzard's map cannot follow.)
+local holdPress
+local OurClick
+
 local function OnGlobalMouseDown(button)
+    holdPress = nil
+    -- (retail: ns.SpaceNavigate; WoW Forever holds only in combat, its clicks eaten there as before)
+    if state == "hold" and ns.SpaceNavigate and Usable() and MouseFocus() == catcher then
+        local x, y = CursorPos()
+        holdPress = { button = button, x = x, y = y }
+    end
     if button ~= "LeftButton" then return end
     drag.swallow = false
     if not Usable() then return end
@@ -1755,9 +2032,35 @@ local function OnGlobalMouseDown(button)
 end
 
 local function OnGlobalMouseUp(button)
-    if button ~= "LeftButton" then return end
-    drag.pending = false
-    if drag.active then EndDrag() end
+    local hp = holdPress
+    holdPress = nil
+    if button == "LeftButton" then
+        drag.pending = false
+        if drag.active then EndDrag() end
+    end
+    -- (1.4.0-beta12: a click while the map holds - still held, so no drag came of the press, the cursor where it was)
+    if hp and hp.button == button and state == "hold" then
+        local x, y = CursorPos()
+        if math.abs(x - hp.x) + math.abs(y - hp.y) <= dragThreshold then OurClick(button) end
+    end
+end
+
+-- The add-on's own click on the map, at rest and (1.4.0-beta12) while it holds; true: the click was ours.
+OurClick = function(button)
+    -- (1.1.0, Follow.lua) a click on your arrow or a party member's dot follows them (on the one followed: stops)
+    if ns.Follow and ns.Follow:OnCanvasClick(button) then return true end
+    -- (Dungeon.lua) a click on a dungeon / raid entrance label opens its maps
+    if ns.Dungeon and ns.Dungeon:OnCanvasClick(button) then return true end
+    -- ((1.4.0-beta14, retail: RetailPortals.lua - nil on WoW Forever) a way across the world: a flight to its end)
+    if ns.RetailPortals and ns.RetailPortals:OnCanvasClick(button) then return true end
+    -- (1.4.0-beta3, retail: RetailDoors.lua - nil on WoW Forever) a click on a door's name flies there, then opens its map;
+    -- (1.4.0-beta10: RetailPins.lua) a flight master's, a point of interest's, a quest's
+    if ns.RetailDoors and ns.RetailDoors:OnCanvasClick(button) then return true end
+    -- ((1.4.0-beta12, retail: RetailSpace.lua - nil on WoW Forever) the map under the cursor: Blizzard's own navigation in
+    -- the add-on's layout - Blizzard's map knows its children where Blizzard lays them out, and while the map holds it is
+    -- another map)
+    if ns.SpaceNavigate and ns.SpaceNavigate(button) then return true end
+    return false
 end
 
 -- Runs before Blizzard turns a canvas click into a map switch. A click that
@@ -1766,10 +2069,7 @@ local function OnCanvasClick(_, button)
     if not ready or not db.enabled then return false end
     if drag.swallow and button == "LeftButton" then return true end
     if state == "free" or state == "fly" or state == "hold" then return true end
-    -- (1.1.0, Follow.lua) a click on your arrow or a party member's dot follows them (on the one followed: stops)
-    if state == "rest" and ns.Follow and ns.Follow:OnCanvasClick(button) then return true end
-    -- (Dungeon.lua) a click on a dungeon / raid entrance label opens its maps
-    if state == "rest" and ns.Dungeon and ns.Dungeon:OnCanvasClick(button) then return true end
+    if state == "rest" and OurClick(button) then return true end
     return false
 end
 
@@ -1785,8 +2085,17 @@ local function OnMapChanged()
         return
     end
     if state == "off" or justShown then
+        if state == "off" and not justShown and doorReturn and BackFromDoor(target.map.id) then return end
         cam.x, cam.y, cam.vw = target.x, target.y, target.vw
         EnterRest()
+        return
+    end
+    -- (1.4.0, retail: RetailSpace.lua) another floor or copy of the map shown - Blizzard's floor list, a phase - lies on
+    -- the same rect: its picture takes over in place (RetailRender.lua crossfades it), the camera stays where it is
+    if (state == "rest" or state == "hold") and ns.SpaceSwap and ns.SpaceSwap(target.map.id) and Holds(target.map, cam) then
+        fly, anchor, restAim = nil, nil, nil
+        SyncReal(target.map)
+        EnterRest(true)
         return
     end
     if ns.Follow then ns.Follow:Stop() end -- (1.1.0: a map change we did not make - a zone clicked, the quest log)
@@ -1877,11 +2186,15 @@ local function ExportCore()
         GoOff = GoOff,
         ResyncFromReal = ResyncFromReal,
         State = function() return state end,
+        -- ((1.4.0-beta12) the view still: at rest, or held where Blizzard's map cannot follow - the markers' hover then)
+        Settled = function() return state == "rest" or state == "hold" end,
         Cam = function() return cam, v end, -- (1.0.0, ZoomReadout.lua)
         -- (1.1.0, Follow.lua)
         CursorPos = CursorPos,
         JumpToZoom = JumpToZoom,
         FlyToZoom = FlyToZoom, -- (1.3.0, PartyBubbles.lua)
+        QuestSafe = QuestSafe, -- (1.4.0-beta3, retail: RetailDoors.lua - a dungeon's map opened by a door click)
+        SetDoorReturn = SetDoorReturn, -- (1.4.0-beta13, retail: RetailDoors.lua)
         -- (1.3.0, PartyBubbles.lua) the width of the view the motion under way ends on - a flight's landing (a notch on
         -- the way included), a wheel zoom's target - else the view's: "your zoom" in the middle of a flight's arc
         LandingVw = function()
@@ -1891,6 +2204,21 @@ local function ExportCore()
         end,
         JustShown = function() return justShown end,
         Wake = function() if ready then driver:Show() end end,
+        -- (1.4.0, retail) a flight to view (x, y, vw) in the camera's own units, as a party bubble's (StartAimed): from
+        -- the view shown, landing on the most detailed map that can show it; false when the map is closed or off
+        FlyToView = function(x, y, vw)
+            if not ready or not db.enabled or not WorldMapFrame:IsShown() or not UpdateView() or state == "off" then return false end
+            local t = FlightTarget(x, y, math.min(vw, 1))
+            if not t then return false end
+            if state == "rest" then
+                local real = ReadRealView()
+                if real then cam.x, cam.y, cam.vw = real.x, real.y, real.vw end
+            end
+            -- ((1.4.0-beta16) a click on a zone, a door or a way takes the map, as a drag does: M opens the map following you, and each of these landed and then flew back to your character)
+            if ns.Follow then ns.Follow:Stop() end
+            StartAimed(t)
+            return true
+        end,
         -- (1.3.1: the fog of war, Gilneas.lua) an area discovered: as MAP_EXPLORATION_UPDATED - the explored art rebuilt
         -- where it is used, and drawn at once at rest
         ExplorationChanged = function()
@@ -1899,6 +2227,29 @@ local function ExportCore()
             if state == "rest" or state == "hold" then
                 restBusy = true
                 driver:Show()
+            end
+        end,
+        -- (1.4.0-beta2, retail: RetailWhy.lua's /unroll why and its silent snapshots - read only) the frames the view
+        -- stands on, live or detached, the map the settle would pick (best) and, asked (full), the one it may switch to
+        -- (QuestSafe: its one-second memo is filled as Core's own asking does); busy: the driver still runs
+        Diag = function(full)
+            local d = { container = container, overlay = overlay, cityLayer = cityLayer, labelLayer = labelLayer, live = live,
+                detached = overlayMoving, busy = driver:IsShown(), real = ReadRealView(), best = ChooseHandover(cam),
+                holder = lastHolderID }
+            local R = ns.GetMap(WorldMapFrame:GetMapID())
+            d.holdsReal = R ~= nil and Holds(R, cam)
+            if full then
+                d.safe = ChooseHandover(cam, QuestSafe)
+                if d.best then d.questSafe = QuestSafe(d.best.id) end
+            end
+            return d
+        end,
+        -- (1.4.0-beta2, retail: /unroll test) draw again at rest, as after a change of the art
+        Redraw = function()
+            if ready and (state == "rest" or state == "hold") then
+                restBusy = true
+                driver:Show()
+                if drawing then redrawAsked = true end
             end
         end,
     }
@@ -1913,8 +2264,9 @@ local function Setup()
 
     Render, Labels = ns.Render, ns.Labels
     container = WorldMapFrame.ScrollContainer
-    local interface = (select(4, GetBuildInfo())) or 0
-    fourArgPanZoom = (container.HasZoomLevels ~= nil) or interface >= 16000
+    -- (1.4.0: ns.FLAVOR, OneCopy.lua - the same answer as the interface number >= 16000 before: every game but Classic
+    -- Era takes the 4th argument - WoW Forever, the other Classic games, retail)
+    fourArgPanZoom = (container.HasZoomLevels ~= nil) or ns.FLAVOR ~= "era"
     dragThreshold = fourArgPanZoom and 4 or 3 -- just under Blizzard's click distance
     blizzWheelMode = container.mouseWheelZoomMode or MAP_CANVAS_MOUSE_WHEEL_ZOOM_BEHAVIOR_FULL or 2
 
@@ -1995,6 +2347,7 @@ local function Setup()
     driver = CreateFrame("Frame")
     driver:Hide()
     driver:SetScript("OnUpdate", OnUpdate)
+    if ns.Perf then ns.Perf.Start() end -- (1.4.0-beta15, retail: RetailBench.lua)
 
     Render:Init(overlay)
     if Render.SetCityLayer then Render:SetCityLayer(cityLayer) end
@@ -2029,6 +2382,7 @@ local function Setup()
     end)
     WorldMapFrame:HookScript("OnHide", function()
         GoOff()
+        doorReturn = nil
         hideGen = hideGen + 1
         local gen = hideGen
         C_Timer.After(RELEASE_DELAY, function()
@@ -2064,10 +2418,11 @@ local function Refresh()
     end
 end
 
-SLASH_AZEROTHUNROLLED1 = "/unroll"
-SLASH_AZEROTHUNROLLED2 = "/azerothunrolled"
-SLASH_AZEROTHUNROLLED3 = "/endlessmap" -- (1.3.1: the add-on's name; /unroll stays the short form the messages name)
-SlashCmdList.AZEROTHUNROLLED = function(input)
+-- The slash words (1.3.1: /endlessmap, the add-on's name; /unroll stays the short form the messages name). (1.4.0-beta4) By
+-- the game (OneCopy.lua ns.COMMANDS, ns.SLASH): WoW Forever and Classic Era SLASH_AZEROTHUNROLLED1..4 = /unroll,
+-- /azerothunrolled, /endlessmap, /emap; retail SLASH_ENDLESSMAP1..2 = /emap, /endlessmap (no /unroll there).
+for i, word in ipairs(ns.COMMANDS) do _G["SLASH_" .. ns.SLASH .. i] = word end
+SlashCmdList[ns.SLASH] = function(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
     local num = tonumber(arg)
     if ns.Options and ns.Options:Slash(cmd, arg, num) then
@@ -2106,6 +2461,13 @@ SlashCmdList.AZEROTHUNROLLED = function(input)
             local secure, by = issecurevariable(d, "questID")
             Print("quest log details: " .. (secure and "clean" or ("tainted by " .. tostring(by))))
         end
+    elseif cmd == "bench" and ns.RetailBench then
+        -- (1.4.0-beta15, retail: RetailBench.lua) what the map costs in this client
+        ns.RetailBench.Slash(arg, Print)
+    elseif (cmd == "why" or cmd == "test") and ns.RetailWhy then
+        -- (1.4.0-beta2, retail: RetailWhy.lua) what the view shows and why; the session's test switches (WoW Forever: the
+        -- help, as before)
+        ns.RetailWhy.Slash(cmd, arg, Print)
     elseif cmd == "debug" then
         if not ready then Print("not set up yet") return end
         local child = container.Child
@@ -2144,32 +2506,54 @@ SlashCmdList.AZEROTHUNROLLED = function(input)
             if others then Print(others) end
         end
     else
-        Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s, flight: %s) | dungeons %s"):format(
-            OnOff(db.enabled), db.maxZoom, db.zoomStep, db.flySpeed,
-            OnOff(db.labels), OnOff(db.labelsAtRest), OnOff(db.flightPaths), OnOff(db.dungeons)))
-        Print("/endlessmap <command> always works; /unroll <command> is the short form:")
-        Print("/unroll on | off")
-        Print("/unroll depth <1-10>   how far past a zone you can zoom")
-        Print("/unroll step <1.05-2>  zoom per wheel notch")
-        Print("/unroll speed <0.25-4> click flight speed")
-        Print("/unroll labels | rest | flight   toggle place labels")
-        Print("/unroll mosaic        toggle unexplored zone land (map-style mosaic)")
-        Print("/unroll cells         toggle seamless zone cells (off: land shapes only)")
-        Print("/unroll livepins      toggle map icons moving with the map (off: hidden while moving)")
-        Print("/unroll dungeons      toggle dungeon maps (click a dungeon label; opens inside dungeons)")
-        Print("/unroll markers       group on entrance maps: the game's own widget / addon dots")
-        Print("/unroll bosses        toggle boss and entrance markers on dungeon maps")
-        Print("/unroll doors         list the doors (hints [on|off]: placeholders; forget [id]: learned doors)")
-        Print("/unroll zoom          toggle a zoom readout on the map (world zoom: 1.00x = the whole world map)")
-        Print(("/unroll cityzoom <N>  world zoom from which the city maps show (default %.2f; off: 1.5x of each city's own zone)"):format(ns.Render.CITY_G))
-        Print(("/unroll cavezoom <N>  world zoom from which the caves show (%d to %d, default %d; off: never)"):format(
-            ns.Render.CAVE_G_MIN, ns.Render.CAVE_G_MAX, ns.Render.CAVE_G))
-        Print("/unroll follow        toggle following a character when you click their arrow / dot on the map")
-        Print("/unroll openzoom <N>  the world zoom M opens the map at, on your character (default 14; off: as the game does)")
-        Print("/unroll openfollow    toggle M also following you (default on)")
-        Print("/unroll taint         check that the map left the objective tracker's quest data clean")
-        Print("/unroll debug         show how the map layers are stacked")
-        Print("/unroll reset")
+        if ns.FLAVOR == "retail" then
+            -- (1.4.0) retail: the settings it has there (no flight master labels, no dungeon maps)
+            Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s)"):format(
+                OnOff(db.enabled), db.maxZoom, db.zoomStep, db.flySpeed, OnOff(db.labels), OnOff(db.labelsAtRest)))
+        else
+            Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s, flight: %s) | dungeons %s"):format(
+                OnOff(db.enabled), db.maxZoom, db.zoomStep, db.flySpeed,
+                OnOff(db.labels), OnOff(db.labelsAtRest), OnOff(db.flightPaths), OnOff(db.dungeons)))
+        end
+        -- ((1.4.0-beta4) C: the short command by the game - /unroll on WoW Forever and Classic Era, /emap on retail)
+        local C = ns.COMMAND
+        Print(("/endlessmap <command> always works; %s <command> is the short form:"):format(C))
+        Print(C .. " on | off")
+        Print(C .. " depth <1-10>   how far past a zone you can zoom")
+        Print(C .. " step <1.05-2>  zoom per wheel notch")
+        Print(C .. " speed <0.25-4> click flight speed")
+        -- (1.4.0) on retail only the lines of what it has there: no mosaic, cells, dungeon maps, markers, bosses, doors,
+        -- city or cave switch (WoW Forever's; RetailRender.lua draws Blizzard's own pictures)
+        local forever = ns.FLAVOR ~= "retail"
+        Print(C .. (forever and " labels | rest | flight   toggle place labels" or " labels | rest   toggle place labels"))
+        if forever then
+            Print(C .. " mosaic        toggle unexplored zone land (map-style mosaic)")
+            Print(C .. " cells         toggle seamless zone cells (off: land shapes only)")
+        end
+        Print(C .. " livepins      toggle map icons moving with the map (off: hidden while moving)")
+        if forever then
+            Print(C .. " dungeons      toggle dungeon maps (click a dungeon label; opens inside dungeons)")
+            Print(C .. " markers       group on entrance maps: the game's own widget / addon dots")
+            Print(C .. " bosses        toggle boss and entrance markers on dungeon maps")
+            Print(C .. " doors         list the doors (hints [on|off]: placeholders; forget [id]: learned doors)")
+        end
+        Print(C .. " zoom          toggle a zoom readout on the map (world zoom: 1.00x = the whole world map)")
+        if forever then
+            Print((C .. " cityzoom <N>  world zoom from which the city maps show (default %.2f; off: 1.5x of each city's own zone)"):format(ns.Render.CITY_G))
+            Print((C .. " cavezoom <N>  world zoom from which the caves show (%d to %d, default %d; off: never)"):format(
+                ns.Render.CAVE_G_MIN, ns.Render.CAVE_G_MAX, ns.Render.CAVE_G))
+        end
+        Print(C .. " follow        toggle following a character when you click their arrow / dot on the map")
+        Print(C .. " openzoom <N>  the world zoom M opens the map at, on your character (default 14; off: as the game does)")
+        Print(C .. " openfollow    toggle M also following you (default on)")
+        Print(C .. " taint         check that the map left the objective tracker's quest data clean")
+        Print(C .. " debug         show how the map layers are stacked")
+        if ns.RetailBench then Print(C .. " bench         what the map costs on this machine (it flies itself for about a minute and a half)") end
+        if ns.RetailWhy then -- (1.4.0-beta2, retail: RetailWhy.lua)
+            Print(C .. " why           what the map shows here and why (kept in the saved settings too)")
+            Print(C .. " test <switch> nomask | noclip | noload | nofade | canvas | off - for this session only")
+        end
+        Print(C .. " reset")
         if ns.Options then ns.Options:Help() end -- (Options.lua: names, icons, button; 1.3.0: bubbles, imagery)
     end
 end
@@ -2177,7 +2561,7 @@ end
 -- (Azeroth Unrolled 1.0.0) what Options.lua and MapMenu.lua need of this file: the defaults (Options.lua adds its own rows:
 -- placeNames, dungeonIcons, mapButton; 1.3.0: bubbles), the chat printer, the redraw, the command handler and its first slash word.
 ns.DEFAULTS, ns.Print, ns.Refresh = DEFAULTS, Print, Refresh
-ns.RunCommand, ns.COMMAND = SlashCmdList.AZEROTHUNROLLED, SLASH_AZEROTHUNROLLED1
+ns.RunCommand = SlashCmdList[ns.SLASH] -- ((1.4.0-beta4) ns.COMMAND, its first slash word: OneCopy.lua)
 
 ---------------------------------------------------------------------------
 -- Events
@@ -2196,8 +2580,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
         if ready then OnGlobalMouseUp(arg1) end
     elseif event == "ADDON_LOADED" then
         if arg1 == ADDON then
-            AzerothUnrolledDB = AzerothUnrolledDB or {}
-            db = AzerothUnrolledDB
+            -- ((1.4.0-beta4) the saved table by the game: AzerothUnrolledDB, on retail EndlessMapDB - OneCopy.lua ns.SAVED)
+            _G[ns.SAVED] = _G[ns.SAVED] or {}
+            db = _G[ns.SAVED]
             -- (1.0.0) The city switch is ONE world zoom by default. What a test build before it saved (false: its default, never a choice;
             -- or a trial number of its tuning aid) gives way to the default once; later /unroll cityzoom choices are kept.
             if db.cityZoomRev ~= 310 then db.cityZoom, db.cityZoomRev = nil, 310 end
@@ -2219,7 +2604,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
         -- (1.3.1) Every copy of the add-on declares this one saved table. A copy that loaded after this one (and stood
         -- down: OneCopy.lua) had its saved file replace the global after our ADDON_LOADED; the game writes the global into
         -- every copy's file at logout, so it must be the table this copy uses (or what changes now would be lost).
-        if db and AzerothUnrolledDB ~= db then AzerothUnrolledDB = db end
+        if db and _G[ns.SAVED] ~= db then _G[ns.SAVED] = db end
         Setup()
     elseif event == "MAP_EXPLORATION_UPDATED" then
         if ready then

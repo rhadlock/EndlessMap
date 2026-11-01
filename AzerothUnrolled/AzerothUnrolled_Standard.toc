@@ -1,0 +1,56 @@
+## Interface: 120105
+## Title: Endless Map
+## Notes: One smooth zoom over the whole world map, from space down to every zone and back. Settings: the round button on the map, or /emap.
+## Author: Hadlock
+## Version: 1.4.0
+## SavedVariables: EndlessMapDB
+## X-License: GPL-3.0-or-later
+## IconTexture: Interface\AddOns\AzerothUnrolled\Media\icon
+## Category: Map
+## X-Curse-Project-ID: 0
+## X-Endless-Toc: Standard
+
+OneCopy.lua
+LoadStamp.lua
+RetailTree.lua
+RetailCellData.lua
+RetailEmptyTiles.lua
+RetailLodData.lua
+RetailMinimapKalimdor.lua
+RetailMinimapEasternKingdoms.lua
+RetailMinimapNorthrend.lua
+RetailMinimapPandaria.lua
+RetailMinimapBrokenIsles.lua
+RetailMinimapZandalar.lua
+RetailMinimapKulTiras.lua
+RetailMinimapMaelstrom.lua
+RetailMinimapDragonIsles.lua
+RetailMinimapKhazAlgar.lua
+RetailMinimapOutland.lua
+RetailMinimapDraenor.lua
+RetailMinimapShadowlands.lua
+RetailPlaces.lua
+RetailCaveData.lua
+Util.lua
+RetailSpace.lua
+RetailCells.lua
+RetailBench.lua
+RetailTiles.lua
+RetailRender.lua
+RetailImagery.lua
+RetailCaves.lua
+Labels.lua
+Core.lua
+ZoomReadout.lua
+HighlightGuard.lua
+Follow.lua
+PartyBubbles.lua
+RetailParty.lua
+RetailGroup.lua
+RetailDoors.lua
+RetailPins.lua
+RetailPortals.lua
+Options.lua
+MapMenu.lua
+OptionsPanel.lua
+RetailWhy.lua

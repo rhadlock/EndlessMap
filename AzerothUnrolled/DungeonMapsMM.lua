@@ -392,9 +392,9 @@ end
 for id, dm in pairs(ns.DUNGEON_MAPS_MM) do ns.DUNGEON_MAPS[id] = dm end
 for k, e in pairs(ns.DUNGEON_ENTRANCES_MM) do ns.DUNGEON_ENTRANCES[k] = e end
 -- (review) the doors only on WoW Forever - Dungeon.lua's own build test: on Classic Era (11508 / 11509) these instances
--- do not exist, and Labels.lua would draw every ns.INSTANCES row on its world map
-local build = (select(4, GetBuildInfo())) or 0
-if build >= 16000 and build < 20000 then
+-- do not exist, and Labels.lua would draw every ns.INSTANCES row on its world map (1.4.0: ns.FLAVOR, OneCopy.lua -
+-- before 1.4.0 the interface number here, 16000 - 19999)
+if ns.FLAVOR == "forever" then
     for _, door in ipairs(ns.FOREVER_DOORS) do
         local dm = ns.DUNGEON_MAPS[door.d]
         if dm and dm.f[door.floor or 1] and ns.INSTANCES and not ns.DUNGEON_ENTRANCES[door.label] then

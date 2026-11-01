@@ -1,10 +1,13 @@
 # Endless Map
 
-Version 1.3.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.4.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
+**Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
+`/emap` and `/endlessmap`, its own README inside. Everything below is about WoW Forever and Classic Era.
+
 Formerly **Azeroth Unrolled** - the same add-on under a new name. Its folder is still `AzerothUnrolled`, so an
-update keeps your settings, and the old commands keep working.
+update keeps your settings, and the old commands keep working; `/emap` works too (1.4.0).
 
 One continuous zoom over the whole world map: scroll from Azeroth straight down to a
 dungeon entrance, drag across zone borders, and see the important places along the way. Questie-friendly.
@@ -128,7 +131,7 @@ shows it as "Custom".
 ## Slash commands
 
 `/endlessmap` shows the settings and this list. Every command works as `/endlessmap <command>` (that one always
-works) or with the short form `/unroll`, as written below; the old `/azerothunrolled` works too.
+works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and the old `/azerothunrolled` work too.
 
 | Command | What it does |
 |---|---|

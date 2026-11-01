@@ -876,16 +876,18 @@ end
 
 -- The zone's cell mask (a ZoneMasks entry), if this client's map is the one
 -- the mask was made for: WoW Forever, same art, same rect on the continent.
--- Anything else (Classic Era, a changed or unknown map) draws a footprint.
+-- Anything else (Classic Era, retail, a changed or unknown map) draws a footprint.
+-- (1.4.0: ns.FLAVOR, OneCopy.lua) The game: WoW Forever - or, as before 1.4.0,
+-- another Classic game ("off"); before 1.4.0 the test was interface >= 16000,
+-- which let retail through too (only its art and rects kept the cells off).
 local cellOf = {}
-local isForever
 local function CellOf(e)
     local c = cellOf[e.id]
     if c == nil then
         c = false
         local m = ns.ZoneMasks and ns.ZoneMasks[e.id]
-        if isForever == nil then isForever = ((select(4, GetBuildInfo())) or 0) >= 16000 end
-        if m and isForever and e.lw == 1002 and e.lh == 668 and C_Map.GetMapArtID
+        local fl = ns.FLAVOR
+        if m and (fl == "forever" or fl == "off") and e.lw == 1002 and e.lh == 668 and C_Map.GetMapArtID
             and C_Map.GetMapArtID(e.id) == m.art then
             local x0, x1, y0, y1 = ns.RectOn(e.id, m.cont)
             local r = m.rc
@@ -1391,38 +1393,14 @@ end
 
 ---------------------------------------------------------------------------
 -- Geometry helpers shared with Core/Labels
+-- (1.4.0: ns.PixelsPerUnit, ns.FitOf, ns.ZoomOf, ns.WorldZoom and ns.WidthForZoom live in Util.lua now - retail draws
+-- with RetailRender.lua and does not load this file)
 ---------------------------------------------------------------------------
-function ns.PixelsPerUnit(v, vw)
-    return v.lw0 * v.fit0 / vw, v.lh0 * v.fit0 / vw
-end
-
-function ns.FitOf(v, e)
-    return math.min(v.W / e.lw, v.H / e.lh)
-end
-
--- Zoom of map e relative to its own fit (1 = fills the view like Blizzard's
--- default view of that map).
-function ns.ZoomOf(v, e, vw)
-    local ppx = v.lw0 * v.fit0 / vw
-    return (e.x1 - e.x0) * ppx / (e.lw * ns.FitOf(v, e))
-end
-
--- (1.0.0) Zoom of the whole world map (1 = Azeroth fills the view): the one global zoom number.
-function ns.WorldZoom(v, vw)
-    local w = ns.maps and ns.maps[ns.WORLD_MAP_ID]
-    if w then return ns.ZoomOf(v, w, vw) end
-    return 1 / vw
-end
-
 -- (1.0.0) The zoom the city switch compares with CITY_IN / CITY_OUT / CITY_PREFETCH: the home zone's own zoom, or -
 -- with a world-zoom switch set (Render:SetCityZoom) - the world zoom scaled so that it reads CITY_IN exactly at it.
 function ns.CityZoomOf(v, h, vw)
     if cityG then return CITY_IN * ns.WorldZoom(v, vw) / cityG end
     return ns.ZoomOf(v, h, vw)
-end
-
-function ns.WidthForZoom(v, e, z)
-    return (e.x1 - e.x0) * v.lw0 * v.fit0 / (z * e.lw * ns.FitOf(v, e))
 end
 
 local function ContAlpha(v, e, vw)

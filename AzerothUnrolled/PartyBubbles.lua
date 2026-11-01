@@ -38,6 +38,8 @@ zone where they are to the right hand side of the bubble"; then: "in raid only y
     shows: nothing runs per frame at rest.
 Nothing here is protected: plain buttons, no secure template, no unit menu; every unit API through pcall, plain values
 only (a secret value is no value), and any of them may be missing (an older client, the offline harness).
+(1.4.0) On retail RetailParty.lua's hooks (nil on WoW Forever) give the box's last line in plain words, the flight from
+a map the add-on stands aside on, and your zoom as wide in yards; your raid index by GUID where UnitIsUnit is a secret.
 ]]
 local _, ns = ...
 if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
@@ -109,12 +111,32 @@ end
 
 -- Your raid index: UnitInRaid's answer where that raid token is you, else the raid token that is you.
 local function MyRaidIndex(n)
+    local said -- (1.4.0) UnitInRaid's index
     if UnitInRaid then
         local ok, i = pcall(UnitInRaid, "player")
-        if ok and Num(i) and i >= 1 and i <= n and Bool(UnitIsUnit, false, "raid" .. i, "player") then return i end
+        if ok and Num(i) and i >= 1 and i <= n then
+            said = i
+            if Bool(UnitIsUnit, false, "raid" .. i, "player") then return i end
+        end
     end
     for i = 1, n do
         if Bool(UnitIsUnit, false, "raid" .. i, "player") then return i end
+    end
+    -- (1.4.0, retail) on a dungeon's or a raid's map the game answers UnitIsUnit with a secret (UnitDocumentation.lua:
+    -- SecretWhenUnitComparisonRestricted) - the column showed you alone there; by GUID then (UnitGUID: plain for you and
+    -- your raid)
+    local me = GUID("player")
+    if me then
+        for i = 1, n do
+            if GUID("raid" .. i) == me then return i end
+        end
+    end
+    -- (1.4.0, retail) no comparison the game answers plainly - UnitIsUnit a secret and no GUIDs (not documented for your
+    -- raid: defensive): UnitInRaid's own index (a luaIndex, UnitDocumentation.lua), unchecked. Never on WoW Forever,
+    -- which has no secret values.
+    if said and UnitIsUnit then
+        local ok, v = pcall(UnitIsUnit, "raid" .. said, "player")
+        if ok and Secret(v) then return said end
     end
 end
 
@@ -266,7 +288,13 @@ end
 
 local function HintOf(u)
     if Followed(u) then return "Click to stop following" end
-    if not (ns.Follow and ns.Follow:Position(u)) then return "Not on the map" end
+    local x, y
+    if ns.Follow then x, y = ns.Follow:Position(u) end
+    -- (1.4.0, retail: RetailParty.lua) in plain words why there is no position (offline, inside an instance, a map the
+    -- add-on does not draw, a secret), or that in combat the map goes to them after the fight; nil: as below
+    local why = ns.PartyWhy and ns.PartyWhy(u, x, y)
+    if why then return why end
+    if not x then return "Not on the map" end
     return "Click to follow"
 end
 
@@ -313,16 +341,25 @@ end
 local function ZoomFor(x, y)
     local db, core = ns.db, ns.Core
     local z = (Num(db.openZoom) and db.openZoom) or 14
+    -- (1.4.0, retail: ns.OpenZoomFor, RetailSpace.lua - that zoom as a view as wide in yards as on WoW Forever)
+    if ns.OpenZoomFor then
+        local oz = ns.OpenZoomFor(x, y, z)
+        if Num(oz) and oz > 0 then z = oz end
+    end
     local cam, v
     if core and core.Cam then cam, v = core.Cam() end
     local world = ns.maps and ns.maps[ns.WORLD_MAP_ID]
     if not (cam and v and Num(v.W) and v.W > 0 and world and ns.WorldZoom and ns.WidthForZoom) then return z end
     local vw = core.LandingVw and core.LandingVw() -- (1.3.0: in a flight's arc, the zoom it lands at)
-    local now = ns.WorldZoom(v, (Num(vw) and vw > 0) and vw or cam.vw)
+    vw = (Num(vw) and vw > 0) and vw or cam.vw
+    local now = ns.WorldZoom(v, vw)
+    -- (1.4.0, retail: RetailParty.lua) your zoom as a view as wide in yards: one world zoom is another width in yards on
+    -- another world (from Orgrimmar's 3,193 yd a bubble landed 1,356 yd wide in Blade's Edge Mountains)
+    if ns.ZoomLike then now = ns.ZoomLike(x, y, vw) or now end
     if Num(now) and now > z then z = now end
     local deep = ns.DeepestMapAt and ns.DeepestMapAt(x, y)
     if deep and Num(db.maxZoom) then
-        local lim = ns.WorldZoom(v, ns.WidthForZoom(v, deep, db.maxZoom))
+        local lim = ns.WorldZoom(v, ns.WidthForZoom(v, deep, deep.maxZoom or db.maxZoom)) -- (1.4.0: deep.maxZoom, retail)
         if Num(lim) and lim > 0 and z > lim then z = lim end
     end
     return z
@@ -330,13 +367,14 @@ end
 
 local function Go(b)
     local u, F, core = b.unit, ns.Follow, ns.Core
-    local go = core and (core.FlyToZoom or core.JumpToZoom) -- (1.3.0: a flight)
+    -- (1.3.0: a flight; 1.4.0, retail: RetailParty.lua - from a map the add-on stands aside on, by that map's zone)
+    local go = ns.PartyFly or (core and (core.FlyToZoom or core.JumpToZoom))
     if not (u and F and go and ns.db) then return end
     if Followed(u) then
         F:Stop()
     else
         local x, y = F:Position(u)
-        if x and go(x, y, ZoomFor(x, y)) then F:Start(u, true) end
+        if x and go(x, y, ZoomFor(x, y), u) then F:Start(u, true) end -- (u: RetailParty.lua PartyFly; Core's take three)
     end
     if hovered == b then FillTip(b) end
 end

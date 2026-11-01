@@ -1867,8 +1867,7 @@ local DATA = {
     },
 }
 
-local interface = (select(4, GetBuildInfo())) or 0
-local forever = interface >= 16000 and interface < 20000
+local forever = ns.FLAVOR == "forever" -- (1.4.0: OneCopy.lua; before 1.4.0 the interface number, 16000 - 19999)
 ns.OVERLAYS = forever and DATA.forever or DATA.era
 -- Smallest overlay tile file (px): WoW Forever re-exported them at 32.
 ns.TILE_FILE_MIN = forever and 32 or 16

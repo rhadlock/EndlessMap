@@ -93,6 +93,10 @@ end
 -- Map registry: every continent/zone we can place on the world map
 ---------------------------------------------------------------------------
 ns.WORLD_MAP_ID = 947
+-- (1.4.0) The map at the top of the camera's space: the world map on WoW Forever and Classic Era; on retail the Cosmic
+-- map 946 (RetailSpace.lua sets it before Core.lua runs). ns.WORLD_MAP_ID stays the map the zoom number counts from
+-- (ns.WorldZoom: 1.00x = Azeroth fills the view) in both.
+ns.ROOT_MAP_ID = ns.WORLD_MAP_ID
 
 local UIMAPTYPE = (Enum and Enum.UIMapType) or {}
 ns.MAPTYPE_WORLD = UIMAPTYPE.World or 1
@@ -282,4 +286,37 @@ function ns.DeepestMapAt(x, y, realOnly)
         end
     end
     return best or ns.maps[ns.WORLD_MAP_ID]
+end
+
+---------------------------------------------------------------------------
+-- Geometry helpers shared with Core/Labels
+-- (1.4.0: moved verbatim from Render.lua, which retail does not load - RetailRender.lua draws there; both flavors call
+-- them. ns.CityZoomOf, which reads Render.lua's city switch, stays there.)
+---------------------------------------------------------------------------
+function ns.PixelsPerUnit(v, vw)
+    return v.lw0 * v.fit0 / vw, v.lh0 * v.fit0 / vw
+end
+
+function ns.FitOf(v, e)
+    return math.min(v.W / e.lw, v.H / e.lh)
+end
+
+-- Zoom of map e relative to its own fit (1 = fills the view like Blizzard's
+-- default view of that map).
+function ns.ZoomOf(v, e, vw)
+    local ppx = v.lw0 * v.fit0 / vw
+    -- ((1.4.0-beta15) ns.FitOf written out: asked hundreds of times a frame - the most of the add-on's Lua; math.min of the two, the same number)
+    local fw, fh = v.W / e.lw, v.H / e.lh
+    return (e.x1 - e.x0) * ppx / (e.lw * ((fh < fw) and fh or fw))
+end
+
+-- (1.0.0) Zoom of the whole world map (1 = Azeroth fills the view): the one global zoom number.
+function ns.WorldZoom(v, vw)
+    local w = ns.maps and ns.maps[ns.WORLD_MAP_ID]
+    if w then return ns.ZoomOf(v, w, vw) end
+    return 1 / vw
+end
+
+function ns.WidthForZoom(v, e, z)
+    return (e.x1 - e.x0) * v.lw0 * v.fit0 / (z * e.lw * ns.FitOf(v, e))
 end

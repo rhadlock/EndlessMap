@@ -99,13 +99,9 @@ local explored, exploredAr, dirty = {}, {}, true
 local cuts                                     -- [k] = the explored page's pictures over piece k: { i, x0, y0, x1, y1 }
 local session = {}                             -- [areaID] = true: discovered with no character to save it under
 
-local isForever
+-- (1.4.0: ns.FLAVOR, OneCopy.lua - before 1.4.0 the interface number here, 16000 - 19999) WoW Forever only
 function G:Supported()
-    if isForever == nil then
-        local iface = (select(4, GetBuildInfo())) or 0
-        isForever = iface >= 16000 and iface < 20000
-    end
-    return isForever and D ~= nil and D.r ~= nil
+    return ns.FLAVOR == "forever" and D ~= nil and D.r ~= nil
 end
 
 local function Secret(v) return issecretvalue ~= nil and issecretvalue(v) == true end

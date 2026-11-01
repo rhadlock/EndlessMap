@@ -33,11 +33,31 @@ local SPEC, LIST, BYCMD = {}, {}, {}
 local function OnOff(b) return b and "|cff40ff40on|r" or "|cffff4040off|r" end
 local function Say(msg) if ns.Print then ns.Print(msg) end end
 local function Redraw() if ns.Refresh then ns.Refresh() end end
-local function Cmd() return ns.COMMAND or "/unroll" end -- (Core.lua: the first slash word)
+local function Cmd() return ns.COMMAND end -- (the first slash word: /unroll, on retail /emap - OneCopy.lua, 1.4.0-beta4)
 O.Cmd = Cmd
+
+-- (1.4.0) The settings of what only WoW Forever (and Classic Era) has - its dungeon maps, doors, markers, city and cave
+-- switches, zone mosaic and flight master labels: on retail (RetailRender.lua draws Blizzard's own pictures) they are
+-- left out of the menus (avail) and their slash commands say "WoW Forever only" (forever).
+local FOREVER_ONLY = { doorHints = true, dungeons = true, bosses = true, cityZoom = true, mosaic = true, engineMarkers = true }
+local function NotRetail() return ns.FLAVOR ~= "retail" end
+-- (1.4.0-beta3, feature complete on retail - docs/retail-engine.md 14) the settings retail has once its file is there: the
+-- door icons and names (RetailDoors.lua), the flight masters' names (the same), the caves (RetailCaves.lua), the zone
+-- cut-outs (RetailCells.lua), the game's own minimap tiles (RetailImagery.lua); WoW Forever's as before
+local RETAIL_HAS = {
+    dungeonIcons = function() return ns.RetailDoors ~= nil end,
+    flightPaths = function() return ns.RetailDoors ~= nil end,
+    portals = function() return ns.RetailPortals ~= nil end,
+    caveZoom = function() return ns.RetailCaves ~= nil end,
+    cells = function() return ns.RetailCells ~= nil end,
+    imageryTiles = function() return ns.RetailImagery ~= nil end,
+}
 
 -- s.said: the chat line after a change - a text that ends in "on" / "off", or a function of the new value.
 local function Add(s)
+    if FOREVER_ONLY[s.key] then s.avail, s.forever = NotRetail, true end
+    local has = RETAIL_HAS[s.key]
+    if has then s.avail, s.forever = function() return NotRetail() or has() end, true end
     SPEC[s.key] = s
     LIST[#LIST + 1] = s
     if s.cmd then BYCMD[s.cmd] = s end
@@ -171,6 +191,7 @@ Add({ key = "labels", kind = "bool", cmd = "labels", said = "place labels ",
     end })
 Add({ key = "labelsAtRest", kind = "bool", cmd = "rest", said = "labels while the map is still ", apply = Redraw })
 Add({ key = "flightPaths", kind = "bool", cmd = "flight", said = "flight master labels ", apply = Redraw })
+if ns.FLAVOR == "retail" then Add({ key = "portals", kind = "bool", cmd = "portals", said = "portal markers ", apply = Redraw }) end
 Add({ key = "mosaic", kind = "bool", cmd = "mosaic", said = "zone map mosaic ", apply = Redraw })
 Add({ key = "cells", kind = "bool", cmd = "cells", said = "seamless zone cells ", apply = Redraw })
 Add({ key = "engineMarkers", kind = "bool", cmd = "markers",
@@ -265,6 +286,10 @@ function O:Slash(cmd, arg, num)
     if cmd == "reset" then return self:Reset() end
     local s = BYCMD[cmd]
     if not s then return false end
+    if s.forever and not s.avail() then -- (1.4.0: on retail)
+        Say(cmd .. ": WoW Forever only")
+        return true
+    end
     if s.kind == "num" then return num ~= nil and self:Set(s.key, num) end
     return self:Toggle(s.key)
 end
@@ -272,6 +297,17 @@ end
 -- The lines Core.lua's command list ends with (the commands this file and MapMenu.lua add).
 function O:Help()
     local c = Cmd()
+    if not NotRetail() then
+        -- (1.4.0) retail: the commands it has there (1.4.0-beta3: the doors, the flight masters, the caves, the imagery)
+        Say(c .. " names | icons   toggle place names / dungeon and raid doors on the map (click a door's name: fly there)")
+        Say(c .. " flight          toggle the flight masters' names")
+        Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
+        Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
+        Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
+        Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
+        Say(c .. " cells           toggle the zones cut to their land (off: each zone's whole picture as you near it)")
+        return
+    end
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
     Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")

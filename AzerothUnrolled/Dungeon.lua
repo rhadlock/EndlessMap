@@ -2188,8 +2188,8 @@ end
 
 function Dungeon:Setup()
     if D.built or not WorldMapFrame or not WorldMapFrame.ScrollContainer then return end
-    local build = (select(4, GetBuildInfo())) or 0
-    D.supported = build >= 16000 and build < 20000 and type(ns.DUNGEON_MAPS) == "table"
+    -- (1.4.0: ns.FLAVOR, OneCopy.lua - before 1.4.0 the interface number here, 16000 - 19999) WoW Forever only
+    D.supported = ns.FLAVOR == "forever" and type(ns.DUNGEON_MAPS) == "table"
         and type(ns.DUNGEON_ENTRANCES) == "table" and type(ns.DUNGEON_CAVES) == "table"
     if not D.supported then return end
 
