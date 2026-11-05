@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.5.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.6.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -24,6 +24,9 @@ dungeon entrance, drag across zone borders, and see the important places along t
 - Map icons (quests, Questie, flight masters...) move with the map. At rest everything the addon draws on the map
   sits *inside* Blizzard's map canvas, below every pin, so every icon stays clickable (only its round buttons and the
   party bubbles lie above it).
+- *Forever:* quest icons from higher up (1.6.0): your quests, the tracked quest's way and the quests on offer, in the
+  game's own look, for every zone in view from world zoom 10 (`/unroll questzoom`) - the game's map shows a zone's
+  quests only on that zone's own map. Hover one for what is left to do; click it to track it (again: stop tracking).
 - Click your arrow (or a party member's dot) and the map follows them - if they take a portal or their hearthstone,
   the map flies after them; M opens the map on your character at world zoom 14, and follows you.
 - Every boat, zeppelin, skycutter, portal and the tram of your faction (1.5.0, WoW Forever; Classic Era: the routes it has): a marker at each
@@ -163,6 +166,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
 | `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
+| `/unroll questzoom <N>`, `default`, `off` | *Forever:* the world zoom from which every zone's quest icons show: 3 to 25, default 10 (a zone's on its own map at the latest); off = the game's own, each zone's on its own map only |
 | `/unroll taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/unroll debug` | how the map layers are stacked (for bug reports) |
 | `/unroll reset` | settings back to their defaults (learned doors are kept) |

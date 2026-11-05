@@ -1,5 +1,6 @@
 --[[
-Endless Map - RetailPins.lua (1.4.0-beta10; retail only: AzerothUnrolled_Standard.toc, after RetailDoors.lua)
+Endless Map - Pins.lua (1.4.0-beta10 as RetailPins.lua, retail only; 1.6.0: both games - AzerothUnrolled_Standard.toc
+after RetailDoors.lua, AzerothUnrolled.toc after ForeverWays.lua; WoW Forever's part at the end of this header)
 
 The markers of every map in view, each with its own map's picture - the player on 1.4.0-beta9: "the instant diamonds are
 missing for most instances", "even the dark portal is missing from the map", "when we shows quests and FP's is also not
@@ -42,18 +43,30 @@ at their true shape over Azeroth) they stood beside their places. Here every map
     POIButtonMixin:OnClick's) or sets the waypoint to an offer. Blizzard's quest pins hidden as the others. Never through
     QuestCache, GetQuestsOnMapCached or GetTasksOnMapCached (Blizzard's Lua caches - an entry made by the add-on would taint
     the quest tracker that reads them: Core.lua QuestSafe): the C_ calls only.
+  * (1.6.0) WOW FOREVER: its map is retail's (Blizzard_WorldMap's providers, POIButton.lua - the same files), and it pins a
+    zone's quests only on that zone's own map (MapUtil.ShouldMapTypeShowQuests), which Core.lua lines up with the view
+    only from the zone's own fit - Elwynn Forest from world zoom 12.88x. The player on 1.5.0: "can we make quest icons
+    visable from higher up? like around 10x zoom level". Here the QUESTS of every continent and zone near the view (the
+    log's, the tracked one's waypoint, world quests, bonus objectives, offers), read and drawn as on retail: a zone's
+    from the world zoom of the quest switch (questG - /unroll questzoom, default QUEST_G 10x; Labels.lua it.worldOn) or
+    from its own fit if that comes first (it.orOwn), a continent's - the tracked quest, which Blizzard pins on a
+    continent - from that continent's own fit (it.ownFrom) up to the switch (it.worldOff), where its zones' take over. Its flight masters (Labels.lua LoadTaxi) and points of interest
+    (Blizzard's, laid out as ours) stay as they were: of Blizzard's pins only the quests' are hidden, and only while ours
+    stand in - the label layer on, at rest too, the switch not off (/unroll questzoom off: Blizzard's own, as before).
 Nothing here writes a Blizzard frame but the alpha of its pins of these kinds; every call through pcall, plain values only.
 ]]
 local _, ns = ...
 if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
-if ns.FLAVOR ~= "retail" then return end
+-- ((1.6.0) WoW Forever too, for its quests - the header; Classic Era's map is its own, without the quests of the log)
+local RETAIL = ns.FLAVOR == "retail"
+if not (RETAIL or ns.FLAVOR == "forever") then return end
 
 local P = ns.RETAIL_PLACES
 local Labels = ns.Labels
-if type(P) ~= "table" or not (Labels and Labels.Add) then return end
+if (RETAIL and type(P) ~= "table") or not (Labels and Labels.Add) then return end
 
 local PN = {}
-ns.RetailPins = PN
+ns.Pins = PN
 
 local STYLE = Labels.STYLE
 -- (the names: WoW Forever's flight master yellow; a point of interest Blizzard's gold; their icons the game's own - it.pic)
@@ -87,6 +100,18 @@ local TEMPLATES = { FlightPointPinTemplate = true, AreaPOIPinTemplate = true, Ar
     -- ((1.4.0-beta11) the quests' - Blizzard_WorldMap.lua's providers' templates)
     QuestPinTemplate = true, QuestOfferPinTemplate = true, QuestHubPinTemplate = true, WorldMap_WorldQuestPinTemplate = true,
     WorldQuestPinTemplate = true, BonusObjectivePinTemplate = true, ThreatObjectivePinTemplate = true }
+if not RETAIL then
+    -- ((1.6.0) WoW Forever: the quests' alone, their hubs among them - QuestOfferDataProvider draws a zone's hubs and
+    -- keeps back the offers one stands for; ours do the same (Read, ReadOffers))
+    TEMPLATES = { QuestPinTemplate = true, QuestOfferPinTemplate = true, QuestHubPinTemplate = true,
+        WorldMap_WorldQuestPinTemplate = true, WorldQuestPinTemplate = true, BonusObjectivePinTemplate = true,
+        ThreatObjectivePinTemplate = true }
+end
+-- ((1.6.0, WoW Forever) the quest switch: the world zoom from which a zone's quests show - the player asked for about 10x
+-- (/unroll questzoom, ZoomReadout.lua) -, a continent's up to it; false: off, Blizzard's own quest pins as before 1.6.0
+local QUEST_G, QUEST_G_MIN, QUEST_G_MAX = 10, 3, 25
+local questG = QUEST_G
+PN.QUEST_G, PN.QUEST_G_MIN, PN.QUEST_G_MAX = QUEST_G, QUEST_G_MIN, QUEST_G_MAX
 -- (Enum.SuperTrackingMapPinType when the enum is missing: AreaPOI 0, QuestOffer 1, TaxiNode 2)
 local MAPPIN_POI, MAPPIN_OFFER, MAPPIN_TAXI = 0, 1, 2
 
@@ -168,6 +193,17 @@ end
 ---------------------------------------------------------------------------
 -- A map's markers (read as it comes near; again when the game says they changed)
 ---------------------------------------------------------------------------
+-- ((1.6.0, WoW Forever) when a quest's marker shows (Labels.lua): a zone's from the switch's world zoom - or from the zone's
+-- own fit, where Blizzard's map of it showed it, should that come first (a large zone: the Barrens) -, a continent's from
+-- its own fit up to the switch (MapUtil.ShouldMapTypeShowQuests: a continent pins the tracked quest alone). On retail with
+-- its map's picture (it.mapBand).
+local function Band(it)
+    if RETAIL then return end
+    local zoneLike = (it.owner.mapType or 3) > 2
+    it.worldOn, it.orOwn = zoneLike and questG or nil, zoneLike and 1 or nil
+    it.worldOff, it.ownFrom = (not zoneLike) and questG or nil, (not zoneLike) and 1 or nil
+end
+
 -- (the item, or nil; quest: (1.4.0-beta11) its icon alone - no name printed -, drawn whatever lies there)
 local function Upsert(e, M, seen, key, px, py, text, kind, style, pic, info, quest)
     if not (text and pic) then return end
@@ -183,11 +219,12 @@ local function Upsert(e, M, seen, key, px, py, text, kind, style, pic, info, que
     else
         it = Labels:Add(x, y, text, kind, e)
         if not it then return end
-        it.style, it.pic, it.mapBand, it.info, it.pin = style, pic, true, info, true
+        it.style, it.pic, it.mapBand, it.info, it.pin = style, pic, RETAIL or nil, info, true
         M.items[key] = it
         pins[#pins + 1] = it
     end
     it.iconOnly, it.always, it.zmin = quest or nil, quest or nil, nil
+    Band(it)
     seen[key] = true
     return it
 end
@@ -297,10 +334,16 @@ local function ReadQuests(e, M, seen)
     local QL = C_QuestLog
     if not (QL and QL.GetQuestsOnMap) or not CVarOn("questPOI") then return end
     local st = Tracked()
+    -- ((1.6.0) QuestDataProviderMixin:ShouldShowQuest: while a quest's details are open in the quest log only that quest,
+    -- and the waypoint is the focused quest's, else the tracked one's - QuestMapFrame_GetFocusedQuestID, read only)
+    local focused = Call(QuestMapFrame_GetFocusedQuestID)
+    if not (Num(focused) and focused > 0) then focused = nil end
+    local wq0 = focused or st
     local zoneLike = (e.mapType or ZONE) > 2 -- (MapUtil.ShouldMapTypeShowQuests: not the Cosmic map, a world, a continent)
     local tasksToo = C_TaskQuest and Yes(C_TaskQuest.DoesMapShowTaskQuestObjectives, e.id)
     local function Add(q, px, py, waypoint)
         if not (Num(q) and px) then return end
+        if focused and q ~= focused then return end
         -- (QuestDataProviderMixin:ShouldShowQuest)
         local wq = Yes(QL.IsWorldQuest, q)
         if (wq and not tasksToo) or (not wq and Yes(QL.IsQuestTask, q)) then return end
@@ -327,11 +370,11 @@ local function ReadQuests(e, M, seen)
     for _, r in ipairs(type(list) == "table" and list or {}) do
         if type(r) == "table" and not r.isMapIndicatorQuest then Add(r.questID, Frac(r.x, r.y)) end
     end
-    if st and QL.GetNextWaypointForMap then
-        local ok, x, y = pcall(QL.GetNextWaypointForMap, st, e.id)
+    if wq0 and QL.GetNextWaypointForMap then
+        local ok, x, y = pcall(QL.GetNextWaypointForMap, wq0, e.id)
         local px, py
         if ok then px, py = Frac(x, y) end
-        if px then Add(st, px, py, true) end
+        if px then Add(wq0, px, py, true) end
     end
 end
 
@@ -486,14 +529,18 @@ local function Read(e)
     end
     M.dirty = false
     local seen = {}
-    if ns.db and ns.db.flightPaths ~= false then ReadTaxi(e, M, seen) end
+    -- ((1.6.0) WoW Forever: its quests alone - the header; none while its switch is off)
+    if RETAIL and ns.db and ns.db.flightPaths ~= false then ReadTaxi(e, M, seen) end
     local A = C_AreaPoiInfo
     local hubs = {}
     if A and A.GetAreaPOIInfo then
-        if A.GetEventsForMap then ReadPois(e, M, seen, Call(A.GetEventsForMap, e.id), "event") end
-        if A.GetDelvesForMap and CVarOn("showDelveEntrancesOnMap") then ReadPois(e, M, seen, Call(A.GetDelvesForMap, e.id), "delve") end
-        if A.GetAreaPOIForMap then ReadPois(e, M, seen, Call(A.GetAreaPOIForMap, e.id), "poi") end
-        -- ((1.4.0-beta11) quest hubs: points of interest that stand for their quests on offer)
+        if RETAIL then
+            if A.GetEventsForMap then ReadPois(e, M, seen, Call(A.GetEventsForMap, e.id), "event") end
+            if A.GetDelvesForMap and CVarOn("showDelveEntrancesOnMap") then ReadPois(e, M, seen, Call(A.GetDelvesForMap, e.id), "delve") end
+            if A.GetAreaPOIForMap then ReadPois(e, M, seen, Call(A.GetAreaPOIForMap, e.id), "poi") end
+        end
+        -- ((1.4.0-beta11) quest hubs: points of interest that stand for their quests on offer - (1.6.0) on WoW Forever too:
+        -- its QuestOfferDataProvider draws them)
         if A.GetQuestHubsForMap and (e.mapType or ZONE) > 2 then ReadPois(e, M, seen, Call(A.GetQuestHubsForMap, e.id), "hub", hubs) end
     end
     -- ((1.4.0-beta11) quests; the map's tasks read once for its world quests, bonus objectives and offers)
@@ -517,25 +564,37 @@ end
 -- Every frame Labels draws (a post-hook): the maps near the view read, once and when changed
 ---------------------------------------------------------------------------
 local KINDS = { zone = true, inset = true, cont = true, globe = true }
+-- ((1.6.0) WoW Forever: its continents and zones, the cities among them - the maps Blizzard pins quests on)
+local function Readable(e)
+    if RETAIL then return KINDS[e.kind] and not e.spaceHidden and e.visibleNow ~= false end
+    return e.mapType == ns.MAPTYPE_CONTINENT or e.mapType == ns.MAPTYPE_ZONE
+end
+-- (map e's markers show now: on retail its picture is drawn; (1.6.0) on WoW Forever its quests' band has begun - Band)
+local function Drawn(e, cam, v)
+    if RETAIL then return ns.Render:MapAlpha(e) > 0 end
+    local w, z = ns.WorldZoom(v, cam.vw), ns.ZoomOf(v, e, cam.vw)
+    if (e.mapType or ZONE) > 2 then return w >= questG * 0.92 or z >= 0.92 end
+    return w < questG and z >= 0.92
+end
 local lastCam, lastV -- (the view Labels last drew: the map at rest reads its changed maps against it)
 -- ((1.4.0-beta16) at most READ_MAX maps a go, those drawn now first, the rest at the next: a read asks the client up to a dozen lists and a zoom out brought in dozens of maps in one
 -- frame, a quest update every map near the view - the stamp's frames of 20 - 39 ms in the labels. Returns how many were read, and whether more wait)
 local READ_MAX = 3
 local function ReadNear(cam, v)
+    if not RETAIL and not questG then return 0, false end -- ((1.6.0) WoW Forever's quest switch off: nothing of ours)
     local ppx, ppy = ns.PixelsPerUnit(v, cam.vw)
     local hx, hy = v.W / 2 / ppx * (1 + 2 * NEAR), v.H / 2 / ppy * (1 + 2 * NEAR)
     local now, n = GetTime(), 0
     local later = false
     for pass = 1, 2 do
         for _, e in ipairs(ns.SpaceAll or ns.drawList or {}) do
-            if KINDS[e.kind] and not e.spaceHidden and e.visibleNow ~= false
-                and e.x0 <= cam.x + hx and cam.x - hx <= e.x1 and e.y0 <= cam.y + hy and cam.y - hy <= e.y1 then
+            if Readable(e) and e.x0 <= cam.x + hx and cam.x - hx <= e.x1 and e.y0 <= cam.y + hy and cam.y - hy <= e.y1 then
                 local M = maps[e]
                 -- ((1.4.0-beta11) a map read before, marked changed: again once READ_EVERY has passed since its last read;
                 -- and read whenever its picture is drawn - a small zone's band comes in below LOAD_ZOOM: Duskwood and Redridge
                 -- at 0.20 of their own with the Eastern Kingdoms' zones, whose markers stayed as first read - or a stale list)
                 if not M or M.dirty then
-                    local drawn = ns.Render:MapAlpha(e) > 0
+                    local drawn = Drawn(e, cam, v)
                     if (pass == 1 and drawn) or (pass == 2 and not drawn and ns.ZoomOf(v, e, cam.vw) >= LOAD_ZOOM) then
                         if n >= READ_MAX or (M and now - (M.at or 0) < READ_EVERY) then
                             later = true
@@ -588,7 +647,10 @@ end
 ---------------------------------------------------------------------------
 local function Ours()
     local core, db = ns.Core, ns.db
-    return db ~= nil and db.enabled ~= false and core ~= nil and core.State ~= nil and core.State() ~= "off"
+    if not (db ~= nil and db.enabled ~= false and core ~= nil and core.State ~= nil and core.State() ~= "off") then return false end
+    -- ((1.6.0) WoW Forever: only while ours stand in - its switch on, the label layer drawn, at rest too -, Blizzard's own
+    -- else: there they lie where ours would. On retail they stay hidden: they do not lie where the add-on draws their maps)
+    return RETAIL or (questG ~= false and db.labels ~= false and db.labelsAtRest ~= false)
 end
 -- (a pin Blizzard sets the alpha of again - MapCanvasPinMixin:ApplyCurrentAlpha at every canvas scale, a POI's alpha limits
 -- (isAlwaysOnFlightmap): moving, Blizzard's map rescales each frame - goes back to 0 in the same call, never drawn between)
@@ -735,9 +797,12 @@ end
 
 -- (RetailDoors.lua OnCanvasClick, a click no door took) true: the click was ours
 function PN:OnCanvasClick(button)
-    if button ~= "LeftButton" or not ns.Core or InCombatLockdown() then return false end
+    if button ~= "LeftButton" or not ns.Core then return false end
     local it = PN:HitTest(ns.Core.CursorPos())
     if not it then return false end
+    -- ((1.6.0) a quest is tracked in combat too, as Blizzard's quest pin does it (POIButtonMixin:OnClick: C_SuperTrack, no
+    -- protected call) - its own pin, hidden, takes no click; another marker's waypoint waits for the fight's end)
+    if InCombatLockdown() and not QUEST_KINDS[it.info.kind] then return false end
     local S = C_SuperTrack
     if not S then return true end
     if QUEST_KINDS[it.info.kind] then
@@ -825,12 +890,16 @@ local function ShowTip(it)
     tip:Show()
 end
 
+-- (a door under the cursor has the hover: retail's RetailDoors.lua, (1.6.0) WoW Forever's dungeon icons - Dungeon.lua)
+local function OnDoor(x, y)
+    if RETAIL then return ns.RetailDoors ~= nil and ns.RetailDoors.HitTest ~= nil and ns.RetailDoors:HitTest(x, y) ~= nil end
+    return Labels:HitTest(x, y) ~= nil
+end
 local function Hover()
     local core = ns.Core
     local it
     if core and core.Settled and core.Settled() and WorldMapFrame and WorldMapFrame:IsShown() and WorldMapFrame.ScrollContainer
-        and WorldMapFrame.ScrollContainer:IsMouseOver() and not (ns.RetailDoors and ns.RetailDoors.HitTest
-        and ns.RetailDoors:HitTest(core.CursorPos())) then
+        and WorldMapFrame.ScrollContainer:IsMouseOver() and not OnDoor(core.CursorPos()) then
         it = PN:HitTest(core.CursorPos())
     end
     if it ~= hot then
@@ -856,7 +925,7 @@ watch:Hide()
 local acc = 0
 watch:SetScript("OnUpdate", function(_, elapsed)
     SyncHiding()
-    SyncArt()
+    if RETAIL then SyncArt() end -- ((1.6.0) Blizzard's art and exploration pin: retail's alone - WoW Forever lays them out as ours)
     acc = acc + (elapsed or 0)
     if acc < 0.05 then return end
     acc = 0
@@ -885,6 +954,10 @@ ev:SetScript("OnEvent", function(_, event, a1)
         if WorldMapFrame then
             if WorldMapFrame.AcquirePin then hooksecurefunc(WorldMapFrame, "AcquirePin", OnAcquire) end
             if WorldMapFrame.RemoveAllPinsByTemplate then hooksecurefunc(WorldMapFrame, "RemoveAllPinsByTemplate", Released) end
+            -- ((1.6.0) a quest's details opened or closed in the quest log: the quests read again - ReadQuests' focus)
+            for _, fn in ipairs({ "QuestMapFrame_ShowQuestDetails", "QuestMapFrame_CloseQuestDetails" }) do
+                if type(_G[fn]) == "function" then hooksecurefunc(fn, Dirty) end
+            end
             -- ((1.4.0-beta15) a map switch's new layers: never shown - SetMapID makes them in one go)
             if WorldMapFrame.RefreshDetailLayers then
                 hooksecurefunc(WorldMapFrame, "RefreshDetailLayers", function()
@@ -912,6 +985,21 @@ ev:SetScript("OnEvent", function(_, event, a1)
         Dirty()
     end
 end)
+
+-- ((1.6.0, WoW Forever: ZoomReadout.lua Apply) the quest switch - a world zoom, false: off. Every quest marker takes the new
+-- band (Band); off, they go and Blizzard's own come back (Ours); on again, every map is read anew.
+function PN:SetQuestZoom(g)
+    if RETAIL then return end
+    if g ~= false then g = (type(g) == "number" and g >= QUEST_G_MIN and g <= QUEST_G_MAX) and g or QUEST_G end
+    if g == questG then return end
+    questG = g
+    for _, it in ipairs(pins) do
+        if g then Band(it) else it.off = true end
+    end
+    Dirty()
+    if ns.Core and ns.Core.Redraw then ns.Core.Redraw() end
+end
+function PN:QuestZoom() return questG end
 
 -- (tests) the markers, the maps read, Blizzard's pins hidden
 PN.T = { pins = pins, maps = maps, hidden = hidden, Hiding = function() return hiding end, Hot = function() return hot end }

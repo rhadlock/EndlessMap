@@ -20,6 +20,10 @@ if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy
 -- (1.1.0) City of Dalaran (2959): Blizzard corrected two room names in 1.60.1.70205 - "The Linguists Lounge" ->
 -- "The Linguist's Lounge", "The Violet HOld" -> "The Violet Hold": the old names' outlines went to the corrected ones
 -- (tools/history/v3.3.0/apply330.py).
+-- (1.6.0) City of Dalaran (2959) again, 1.60.1.70790 (WoW Forever's launch client): "Dalaran Exchange" -> "Dalaran
+-- Visitor Center", "Wands and Wonder" -> "The Wonder Works", five of The Linguist's Lounge's six groups ->
+-- "Runeweaver Lounge" (its upper floor's too); those rooms' outlines from the 70790 regeneration (the geometry is the
+-- same), every other name as before - the Violet Hold's 1.1.0 outlines kept (tools/subzones/rename_70790.py).
 ns.SUBZONE_GRID = { 111, 74 }
 ns.SUBZONE_REGIONS = {
   [33] = { -- Shadowfang Keep
@@ -435,9 +439,9 @@ ns.SUBZONE_REGIONS = {
       ["Cartier & Co. Fine Jewelry"] = "?b?b?c@v@v",
       ["Curiosities & Moore"] = "N8N8ONPcPc",
       ["Dalaran"] = "OU'-[](?ZA(Hr[)R[S)`*t*f[R+yZ=-0V[-@r].Ur^/WUF0jT11#qJ1}Rw3Lp74bmn5ylZ5~mt72j475j677o/8Hh}8Nrm9dd4:zaj;fO9<4`V=Ial>1N$>_am?t`Y@XLkBA^2C$FaF#ZgIaYSL.X@UEUE]lgZ`7f@aJe+b}b}eGj<f]i)grgrhlhoj%rXkGkGl_o+mrmro$o%p-rUp8p8pBpCpEqYq@q@qWqWsmso",
-      ["Dalaran Exchange"] = "ONONOOPbQw",
       ["Dalaran Merchant's Bank"] = "O?LsQiN)PRN-PUO<O<QgQg",
       ["Dalaran Orphanage"] = "[rV|_>X3`PX6`SYK_@ZZZZZa_A^'`O^.^._:_:`R`R",
+      ["Dalaran Visitor Center"] = "ONONOOPbQw",
       ["Eclipse with Shears"] = "JfJfK|",
       ["First to your Aid"] = "=7=7>K>J>J",
       ["Forge of Fate"] = "@{@{@|",
@@ -449,6 +453,7 @@ ns.SUBZONE_REGIONS = {
       ["One More Glass"] = "M2KzNFM1M1M3M3",
       ["Path of Renewal"] = "A#>UCL?iB5?mDbA&COB<B<D`Da",
       ["Presage Plaza"] = "SAIQYDJeUcJgZ_Jp^/L%_BL)X<M?SHNDTMNTP}YO[x[o[s^(^+_=`S`T`Uagaib|b|",
+      ["Runeweaver Lounge"] = "IKH7KuIJJ_IMJb",
       ["Runeweaver Square"] = "M)IHORJ[OPJ_N?KoN;PfPf",
       ["Sisters Sorcerous"] = "C6C6DK",
       ["Talismanic Textiles"] = ":k:k:l<$=9",
@@ -458,7 +463,7 @@ ns.SUBZONE_REGIONS = {
       ["The Atrium of Fortune"] = "As;kG}<|Fh=$G~>3EP>9H$?OJO@ZD;@gLyA|L|C7H,DLDLG{G{I8I8JTKiKcKdLxLx",
       ["The Dalaran Charter"] = "G1B<JoCOJmCRJpDbJlDhI]EuJjG,JiISIS",
       ["The Eventide"] = "QmK^R}LqRzLuT:N(QeN2UROJS+P`QtT4T5UKUNVaVfWvWyY/Y0",
-      ["The Linguist's Lounge"] = "ILF{F{H7H7ILKuJbJbPbQwH7KuIJJ_IMJb",
+      ["The Linguist's Lounge"] = "IJIJILJ_J`",
       ["The Militant Mystic"] = "S$S$T9",
       ["The Purple Parlor"] = "230{3H22222525",
       ["The Scribes' Sacellum"] = "B-B-B.",
@@ -468,9 +473,9 @@ ns.SUBZONE_REGIONS = {
       ["The Violet Citadel"] = "4W*k:`+~:],&;u-5:[-;=..P9P/h7*0q9F0~5s4P6y8=8=:c;x;r;s=/=/",
       ["The Violet Gate"] = "PgPgPhQ|S5",
       ["The Violet Hold"] = "c|UUqGVfp.ViqEVln~Wyp-W{qDX'mkY<kCZDntZQgd[gbp]|]|`8m_e,k5p4p4",
+      ["The Wonder Works"] = "FzFzH3IGIG",
       ["Trade District"] = "?_?_B+@r@r",
       ["Violet Plates and Framing"] = "CGB3D[CFCFCHCH",
-      ["Wands and Wonder"] = "FzFzH3IGIG",
     },
     { -- 2 Hillsbrad Foothills (south of the city)
       ["Alterac Valley"] = "<V538p6F7Z6H8q7^7^:-=k;@<T;C=l<X<X?#?#",
@@ -478,9 +483,9 @@ ns.SUBZONE_REGIONS = {
       ["Archival Exhibit"] = ")q(]+))p)p)r)r",
       ["Curiosities & Moore"] = "$h$h$j%}%~",
       ["Dalaran"] = "0~#E)O#l.j$X'%$[+,%%-V&:,C*d*d+z,@-3/}0q152*2H3>3Y3[3[4S4m5h78798M858L9K9a:a=@>@>J>O>S?S?^?e?i@i@q@|@|A~B'C9C9",
-      ["Dalaran Exchange"] = "%}%}'6",
       ["Dalaran Merchant's Bank"] = "$]#H'*$[%p$_%s",
       ["Dalaran Orphanage"] = "/w+%2B,82A,:3W-O2D.`.`.e111,1,",
+      ["Dalaran Visitor Center"] = "%}%}'6",
       ["Darrow Hill"] = "V5J$YsK7[*K9X`LJ]=T{^PV2_dWE_cXX^M[$]8",
       ["Glorious Goods"] = "*l*l*m,$,$",
       ["Hillsbrad Foothills"] = "ba%0N]&COo&FN^'[.|(t-i-`{Q.s|e0*|d01031E2Z3nN_6;MK8Z|c8eHW9n|b9zGD;%|a;3F1<8|`<HDz=K|_=^Cg>_|^>sBS@PgNAdf*Au|7Bw]SC.|8D.[>DC|=EAZ)E]|>E{|]Fr|BG2|[H.|CHE|ZIC|DIX|YJX|XTdeVUydFW5c3hThcijmWn`nloup$q.q8rCrLsXsatnxUydyjz|z~|5|6",
@@ -488,10 +493,10 @@ ns.SUBZONE_REGIONS = {
       ["Magical Menagerie"] = "(T'@*}(S)h(U)j",
       ["One More Glass"] = "#`#`#b",
       ["Presage Plaza"] = ")n#`)t$s*|%$&8&*&*(R)g*},?-J.h/t/{1-122B2E3V3X4l4l",
+      ["Runeweaver Lounge"] = "%~%~'6",
       ["Runeweaver Square"] = "$l#W&%$k$k$n$n",
       ["The Arsenal Absolute"] = ")[)[,)",
       ["The Eventide"] = "'.#G(C$Z''$d*o%{(G'4'4)T)W*j*l,#,&-8-9",
-      ["The Linguist's Lounge"] = "%~%~'6",
       ["The Militant Mystic"] = "(A(A(B)U)U",
       ["The Violet Gate"] = "&&&&(N';(O",
       ["The Violet Hold"] = "7'*r?Z,&?V,)@m,,>H-9?T-<@l-B=5.W:j/m5v0u>?1&1&4T;r?[?[@k@k@n@n",

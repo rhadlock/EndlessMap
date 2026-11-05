@@ -20,7 +20,7 @@ ns.OptionsPanel = P
 
 local TITLE = ns.TITLE or "Endless Map" -- (Options.lua)
 local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton" } -- (1.3.0: + bubbles, imagery)
-local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "openZoom" }
+local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 local NONE = 0 -- (a dropdown value must be a number: stands for cityZoom = false)
 
 local function PresetText(s, value, name, isDefault)

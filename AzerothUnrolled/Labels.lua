@@ -586,20 +586,33 @@ function Labels:Draw(cam, v)
             -- (1.3.1: Gilneas's names - it.homemade - in the imagery's bands everywhere: its page prints no names either)
             -- ((1.4.0-beta10, retail: RetailPins.lua - it.mapBand) a map's own marker comes and goes with that map's picture
             -- (Render:MapAlpha): every map drawn shows its own, each at once - not a band of its own zoom)
-            if it.worldOn then
+            if it.worldOn or it.worldOff then
                 -- ((1.4.0-beta14: Portals.lua) from a zoom of the world, whatever map it lies on: a band of 8%)
-                local t = (ns.WorldZoom(v, cam.vw) - it.worldOn * 0.92) / (it.worldOn * 0.08)
+                -- ((1.6.0, WoW Forever: Pins.lua's quests) it.worldOff: up to that zoom instead - a continent's tracked
+                -- quest; it.orOwn: or from that zoom of its own map, should it come first - a zone's quests from the zone's
+                -- fit, where Blizzard's map of it showed them; it.ownFrom: and not before that zoom of its own map - a
+                -- continent's from its fit, where Blizzard's map is that continent)
+                local g = it.worldOn or it.worldOff
+                local t = (ns.WorldZoom(v, cam.vw) - g * 0.92) / (g * 0.08)
                 a = t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t)
+                if it.worldOff then a = 1 - a end
+                local k = it.orOwn or it.ownFrom
+                if k then
+                    local u = (ns.ZoomOf(v, it.owner, cam.vw) - k * 0.92) / (k * 0.08)
+                    u = u <= 0 and 0 or u >= 1 and 1 or u * u * (3 - 2 * u)
+                    if it.orOwn then a = math.max(a, u) else a = a * u end
+                end
             elseif it.mapBand then
                 a = ns.Render:MapAlpha(it.owner)
-                if it.zmin and a > 0 then
-                    -- ((1.4.0-beta11) it.zmin: not before its map is this deep - see ZMIN_RAMP)
-                    local z = ns.ZoomOf(v, it.owner, cam.vw)
-                    local t = (z - it.zmin * ZMIN_RAMP) / (it.zmin * (1 - ZMIN_RAMP))
-                    a = a * (t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t))
-                end
             else
                 a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm or it.homemade == true)
+            end
+            if it.zmin and a > 0 then
+                -- ((1.4.0-beta11) it.zmin: not before its map is this deep - see ZMIN_RAMP; (1.6.0) whatever its band:
+                -- WoW Forever's quest hubs' offers too)
+                local z = ns.ZoomOf(v, it.owner, cam.vw)
+                local t = (z - it.zmin * ZMIN_RAMP) / (it.zmin * (1 - ZMIN_RAMP))
+                a = a * (t <= 0 and 0 or t >= 1 and 1 or t * t * (3 - 2 * t))
             end
             -- (1.3.0: a sub-zone's name; 1.3.1: the fog of war - Gilneas's, it.areaID)
             if (it.pieces or it.areaID) and a > 0 and not SubzoneExplored(it) then a = 0 end

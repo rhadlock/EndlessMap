@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.5.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
+Version 1.6.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
 
 One smooth zoom over the whole world map. Open the map and you are in space, on Blizzard's map of the worlds; scroll
 into any world, any continent, through the small inset maps (Argus, the Maelstrom, Nazjatar, ...) down to the centre

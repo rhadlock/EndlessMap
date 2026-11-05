@@ -10,6 +10,9 @@ A tuning aid; nothing here draws map art.
   /unroll cavezoom N  (1.2.0) the WORLD zoom from which the caves show (Caves.lua); default = 30x, off =
                    never. Over a cave the wheel stops short of it, the cave shows at the deepest zoom there. Saved
                    (AzerothUnrolledDB.caveZoom).
+  /unroll questzoom N  (1.6.0, WoW Forever) the WORLD zoom from which every zone's quest icons show (Pins.lua) - a
+                   zone's at its own map's zoom if that comes first; default = 10x, off = Blizzard's own (a zone's
+                   on its own map only). Saved (AzerothUnrolledDB.questZoom).
 ]]
 local _, ns = ...
 if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
@@ -83,6 +86,7 @@ function Z:Apply()
     if not db then return end
     if ns.Render and ns.Render.SetCityZoom then ns.Render:SetCityZoom(db.cityZoom) end
     if ns.Render and ns.Render.SetCaveZoom then ns.Render:SetCaveZoom(db.caveZoom) end -- (1.2.0)
+    if ns.Pins and ns.Pins.SetQuestZoom then ns.Pins:SetQuestZoom(db.questZoom) end -- (1.6.0, WoW Forever)
     if db.zoomReadout then
         if Ensure() then
             frame:Show()
@@ -108,16 +112,36 @@ local function SwitchSetting(cmd, num, arg, lo, hi, default, Print, offWords)
     end
 end
 
--- cmd = "zoom" | "cityzoom" | "cavezoom", num = the number typed (or nil), Print = the chat printer of Core, arg = the
--- text typed.
+-- cmd = "zoom" | "cityzoom" | "cavezoom" | (1.6.0) "questzoom", num = the number typed (or nil), Print = the chat printer
+-- of Core, arg = the text typed.
 function Z:Slash(cmd, num, Print, arg)
     local db, R = ns.db, ns.Render
     if not (db and R and R.ZoomLines) then
         Print("zoom: not available")
         return
     end
-    if (cmd == "cavezoom" and not R.CaveZoom) or (cmd == "cityzoom" and not R.CityZoom) then
+    if (cmd == "cavezoom" and not R.CaveZoom) or (cmd == "cityzoom" and not R.CityZoom) or (cmd == "questzoom" and ns.FLAVOR ~= "forever") then
         Print(cmd .. ": WoW Forever only") -- (1.4.0: retail has no city switch - RetailRender.lua; 1.4.0-beta3: its caves, RetailCaves.lua)
+        return
+    end
+    if cmd == "questzoom" then
+        -- (1.6.0) the world zoom from which a zone's quests show (Pins.lua) - the player: "like around 10x zoom level"
+        local PN = ns.Pins
+        if not PN then
+            Print(cmd .. ": not available")
+            return
+        end
+        local v = SwitchSetting(cmd, num, arg, PN.QUEST_G_MIN, PN.QUEST_G_MAX, PN.QUEST_G, Print)
+        if v ~= nil then
+            db.questZoom = v
+            self:Apply()
+        end
+        local g = PN:QuestZoom()
+        if g then
+            Print(("quest icons show above world zoom %.2fx - a zone's at its own map's zoom if that comes first. %s questzoom default = %.2fx, off = Blizzard's own (a zone's on its own map only)"):format(g, ns.COMMAND, PN.QUEST_G))
+        else
+            Print(("quest icons are Blizzard's own (a zone's on its own map only). %s questzoom default = world zoom %.2fx"):format(ns.COMMAND, PN.QUEST_G))
+        end
         return
     end
     if cmd == "cavezoom" then

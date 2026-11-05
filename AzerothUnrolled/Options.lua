@@ -39,7 +39,8 @@ O.Cmd = Cmd
 -- (1.4.0) The settings of what only WoW Forever (and Classic Era) has - its dungeon maps, doors, markers, city and cave
 -- switches, zone mosaic and flight master labels: on retail (RetailRender.lua draws Blizzard's own pictures) they are
 -- left out of the menus (avail) and their slash commands say "WoW Forever only" (forever).
-local FOREVER_ONLY = { doorHints = true, dungeons = true, bosses = true, cityZoom = true, mosaic = true, engineMarkers = true }
+local FOREVER_ONLY = { doorHints = true, dungeons = true, bosses = true, cityZoom = true, mosaic = true, engineMarkers = true,
+    questZoom = true } -- (1.6.0: retail's quests come with their maps' pictures - Pins.lua)
 local function NotRetail() return ns.FLAVOR ~= "retail" end
 -- (1.4.0-beta3, feature complete on retail - docs/retail-engine.md 14) the settings retail has once its file is there: the
 -- door icons and names (RetailDoors.lua), the flight masters' names (the same), the caves (RetailCaves.lua), the zone
@@ -164,6 +165,21 @@ Add({ key = "caveZoom", kind = "num", lo = ns.Render.CAVE_G_MIN, hi = ns.Render.
         if ns.ZoomReadout then ns.ZoomReadout:Apply() end
         if ns.Core then Redraw() end
     end })
+-- (1.6.0, Pins.lua) the quest switch; no command of its own: ZoomReadout.lua handles /unroll questzoom, as cavezoom
+local QG = ns.Pins and ns.Pins.QUEST_G
+if QG then
+    Add({ key = "questZoom", kind = "num", lo = ns.Pins.QUEST_G_MIN, hi = ns.Pins.QUEST_G_MAX, orFalse = true,
+        label = "Quest icons appear", unit = "x",
+        tip = "The zoom (1x = the whole world map) from which every zone's quest icons show - a zone's on its own map at the latest. Off: the game's own, on each zone's own map only.",
+        said = function(v)
+            return v and ("quest icons show from world zoom %gx"):format(v) or "quest icons: the game's own, on each zone's own map only"
+        end,
+        presets = { { 6, "Sooner" }, { QG, "Normal" }, { 13, "Later" }, { false, "Off (the game's)" } },
+        apply = function()
+            if ns.ZoomReadout then ns.ZoomReadout:Apply() end
+            if ns.Core then Redraw() end
+        end })
+end
 
 -- (1.3.0, PartyBubbles.lua) you and your party in round bubbles under the map's top left button
 Add({ key = "bubbles", kind = "bool", cmd = "bubbles", label = "Party bubbles", said = "party bubbles on the map ",
@@ -211,7 +227,8 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 
 -- The defaults of the settings this file adds (Core.lua fills the saved table from ns.DEFAULTS on ADDON_LOADED and on
 -- /unroll reset; its own rows are in Core.lua).
-local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true } -- (1.3.0: + bubbles, imagery, imageryTiles)
+local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true, -- (1.3.0: + bubbles, imagery, imageryTiles)
+    questZoom = QG } -- (1.6.0; nil where Pins.lua is not - Classic Era)
 if ns.DEFAULTS then
     for k, v in pairs(OWN_DEFAULTS) do
         if ns.DEFAULTS[k] == nil then ns.DEFAULTS[k] = v end

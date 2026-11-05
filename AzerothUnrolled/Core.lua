@@ -2053,9 +2053,10 @@ OurClick = function(button)
     if ns.Portals and ns.Portals:OnCanvasClick(button) then return true end
     -- (Dungeon.lua) a click on a dungeon / raid entrance label opens its maps
     if ns.Dungeon and ns.Dungeon:OnCanvasClick(button) then return true end
-    -- (1.4.0-beta3, retail: RetailDoors.lua - nil on WoW Forever) a click on a door's name flies there, then opens its map;
-    -- (1.4.0-beta10: RetailPins.lua) a flight master's, a point of interest's, a quest's
+    -- (1.4.0-beta3, retail: RetailDoors.lua - nil on WoW Forever) a click on a door's name flies there, then opens its map
     if ns.RetailDoors and ns.RetailDoors:OnCanvasClick(button) then return true end
+    -- (1.4.0-beta10, Pins.lua) a flight master's, a point of interest's, a quest's - (1.6.0) on WoW Forever its quests'
+    if ns.Pins and ns.Pins:OnCanvasClick(button) then return true end
     -- ((1.4.0-beta12, retail: RetailSpace.lua - nil on WoW Forever) the map under the cursor: Blizzard's own navigation in
     -- the add-on's layout - Blizzard's map knows its children where Blizzard lays them out, and while the map holds it is
     -- another map)
@@ -2431,7 +2432,7 @@ SlashCmdList[ns.SLASH] = function(input)
         -- and the Settings page share)
     elseif cmd == "doors" then
         if ns.Doors then ns.Doors:Slash(arg) else Print("doors: not available") end
-    elseif cmd == "zoom" or cmd == "cityzoom" or cmd == "cavezoom" then
+    elseif cmd == "zoom" or cmd == "cityzoom" or cmd == "cavezoom" or cmd == "questzoom" then -- (1.6.0: questzoom)
         if ns.ZoomReadout then
             ns.ZoomReadout:Slash(cmd, num, Print, arg)
             if ready then Refresh() end
@@ -2542,6 +2543,10 @@ SlashCmdList[ns.SLASH] = function(input)
             Print((C .. " cityzoom <N>  world zoom from which the city maps show (default %.2f; off: 1.5x of each city's own zone)"):format(ns.Render.CITY_G))
             Print((C .. " cavezoom <N>  world zoom from which the caves show (%d to %d, default %d; off: never)"):format(
                 ns.Render.CAVE_G_MIN, ns.Render.CAVE_G_MAX, ns.Render.CAVE_G))
+            if ns.Pins and ns.Pins.QUEST_G then -- (1.6.0)
+                Print((C .. " questzoom <N> world zoom from which every zone's quest icons show (%d to %d, default %d; off: Blizzard's own)"):format(
+                    ns.Pins.QUEST_G_MIN, ns.Pins.QUEST_G_MAX, ns.Pins.QUEST_G))
+            end
         end
         Print(C .. " follow        toggle following a character when you click their arrow / dot on the map")
         Print(C .. " openzoom <N>  the world zoom M opens the map at, on your character (default 14; off: as the game does)")
@@ -2596,6 +2601,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
             end
             if db.cityZoom ~= false and type(db.cityZoom) ~= "number" then db.cityZoom = DEFAULTS.cityZoom end
             if db.caveZoom ~= false and type(db.caveZoom) ~= "number" then db.caveZoom = DEFAULTS.caveZoom end -- (1.2.0)
+            -- (1.6.0, Pins.lua) the quest switch: a world zoom it takes, or off - anything else its default
+            local PN = ns.Pins
+            if PN and db.questZoom ~= false and not (type(db.questZoom) == "number" and db.questZoom >= PN.QUEST_G_MIN
+                and db.questZoom <= PN.QUEST_G_MAX) then db.questZoom = DEFAULTS.questZoom end
             ns.db = db -- (ZoomReadout:Apply gives the renderer the saved switches at login)
         elseif arg1 == "Blizzard_WorldMap" and IsLoggedIn() then
             Setup()

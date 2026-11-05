@@ -58,7 +58,7 @@ local ART_TOGGLE = "Interface\\Minimap\\UI-Minimap-ZoomButton-Toggle" -- (1.3.0:
 
 -- The menu, top to bottom.
 local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout" } -- (1.3.0: + bubbles, imagery)
-local ZOOM = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "openZoom" }
+local ZOOM = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 
 local S = {} -- button, icon, caves, cavesIcon, layer, layerIcon, layerGlow, tip, tipText, dropdown (true: Blizzard's menu)
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Endless Map 1.6.0
+
+- **WoW Forever: quest icons from higher up** (1.6.0-beta1). Your quests, the tracked quest's way and the quests on offer show for every zone in view from world zoom 10 (`/unroll questzoom`, or the settings' "Quest icons appear") - the game's map shows a zone's quests only on that zone's own map. They look as the game draws them; hover one for what is left to do, click it to track it (again: stop tracking). `/unroll questzoom off` gives the game's own back. A click tracks a quest in combat too, as the game's icon does; while a quest's details are open in the quest log only that quest shows, as on the game's map; quest hubs show with the quests on offer they stand for coming in as you zoom in.
+- **City of Dalaran: the room names of WoW Forever's launch** (1.6.0-beta1): Dalaran Visitor Center, Runeweaver Lounge and The Wonder Works light up again where you stand.
+- **Boss numbers in the game's order** (1.6.0-beta1): Ruins of Lordaeron (Viktor the Vile 4, Bjork 5, Rath'mael 6) and City of Dalaran (Shade of the Archmage 9).
+
 ## Endless Map 1.5.0
 
 - **WoW Forever: every boat, zeppelin, skycutter, portal and the tram on the map** (1.5.0-beta1). A marker at each dock and portal from the zoom the continents fill the view, your faction's ways only; hover for an arc to where it goes, click a way to fly there. Zephras Isle has no place on the Azeroth map: its arc rises off the top and a click opens Blizzard's map of the isle. The Deeprun Tram keeps its door: hover for the arc, click for the tram's map. `/unroll portals` turns the markers off and on. Names are in English. Classic Era shows only the routes it has.

@@ -385,12 +385,12 @@ end
 -- (Core.lua OnCanvasClick, at rest) true: the click was ours
 function D:OnCanvasClick(button)
     if button ~= "LeftButton" or not ns.Core then return false end
-    -- ((1.4.0-beta10) a click no door takes: the flight masters' and the points of interest's - RetailPins.lua)
-    local function Pins() return ns.RetailPins ~= nil and ns.RetailPins:OnCanvasClick(button) end
-    if ns.db and ns.db.dungeonIcons == false then return Pins() end
+    -- ((1.4.0-beta10) a click no door takes: the flight masters' and the points of interest's - Pins.lua, which Core.lua
+    -- asks next (1.6.0: for both games))
+    if ns.db and ns.db.dungeonIcons == false then return false end
     local x, y = ns.Core.CursorPos()
     local it = D:HitTest(x, y)
-    if not it then return Pins() end
+    if not it then return false end
     pending = { it = it, at = GetTime(), cam = CamNow() }
     if InCombatLockdown() then
         pending.combat = true -- (the flight and the map after the fight: PLAYER_REGEN_ENABLED - if the camera stays)

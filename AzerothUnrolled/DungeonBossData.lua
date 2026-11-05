@@ -323,10 +323,10 @@ ns.DUNGEON_BOSSES = {
     { e = 3353, o = 1, n = "Witherfang", f = 1, u = 0.6597, v = 0.3385, q = 2, src = "G" },
     { e = 3357, o = 2, n = "The Abandoned", f = 1, u = 0.3538, v = 0.5073, q = 2, src = "G" },
     { e = 3355, o = 3, n = "The Butcher", f = 1, u = 0.5652, v = 0.7017, q = 2, src = "G", aka = "The Baron" },
-    { e = 3354, o = 4, n = "Rath'mael", f = 1, u = 0.4109, v = 0.6184, q = 2, src = "G" },
     { e = 3408, n = "Lordaeron Captain", opt = true }, -- no position: sources contradict each other (ForeverChanges vs Icy Veins nearly swapped) - no position
-    { e = 3411, o = 5, n = "Viktor the Vile", f = 1, u = 0.3148, v = 0.6439, q = 2, src = "G" },
-    { e = 3412, o = 6, n = "Bjork" }, -- no position: sources contradict each other (ForeverChanges vs Icy Veins nearly swapped) - no position
+    { e = 3411, o = 4, n = "Viktor the Vile", f = 1, u = 0.3148, v = 0.6439, q = 2, src = "G" },
+    { e = 3412, o = 5, n = "Bjork" }, -- no position: sources contradict each other (ForeverChanges vs Icy Veins nearly swapped) - no position
+    { e = 3354, o = 6, n = "Rath'mael", f = 1, u = 0.4109, v = 0.6184, q = 2, src = "G" },
   },
   [2959] = { -- City of Dalaran
     { e = 3298, o = 1, n = "Arcane Anomaly" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
@@ -334,10 +334,10 @@ ns.DUNGEON_BOSSES = {
     { e = 3300, o = 3, n = "Mana Devourer" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
     { e = 3301, o = 4, n = "Mana Elemental" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
     { e = 3302, o = 5, n = "Unstable Sentinel" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
-    { e = 3303, o = 6, n = "Shade of the Archmage", f = 1, u = 0.4468, v = 0.1697, q = 1, src = "R" }, -- approximate: room named in the client (WMO group 73) where the demo fought him; instance closed
-    { e = 3310, o = 7, n = "Lyn the Ignored" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
-    { e = 3311, o = 8, n = "Atrexis the Grave Knight" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
-    { e = 3312, o = 9, n = "Mana Wraith" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
+    { e = 3310, o = 6, n = "Lyn the Ignored" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
+    { e = 3311, o = 7, n = "Atrexis the Grave Knight" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
+    { e = 3312, o = 8, n = "Mana Wraith" }, -- no position: no position: only a street/area description from the BlizzCon demo, or not seen
+    { e = 3303, o = 9, n = "Shade of the Archmage", f = 1, u = 0.4468, v = 0.1697, q = 1, src = "R" }, -- approximate: room named in the client (WMO group 73) where the demo fought him; instance closed
   },
   [2998] = { -- Excavation Site
     { e = 3480, o = 1, n = "Saltspine" }, -- no position: no position: nobody has been inside (instance closed in the beta)
