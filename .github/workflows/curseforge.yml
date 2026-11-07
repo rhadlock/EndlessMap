@@ -20,6 +20,10 @@ on:
         type: choice
         options: [all, Forever, Retail]
         default: all
+      changelog_only:
+        description: "Only set the changelog of files already on CurseForge, e.g. Retail=9501221,Forever=9501388 (nothing is uploaded)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -38,4 +42,5 @@ jobs:
           UPLOAD: ${{ github.event_name == 'release' || inputs.upload }}
           PRERELEASE: ${{ github.event_name == 'release' && github.event.release.prerelease }}
           ONLY: ${{ github.event_name == 'release' && 'all' || inputs.only }}
+          FIX: ${{ github.event_name == 'release' && '' || inputs.changelog_only }}
         run: python3 .github/scripts/curseforge.py
