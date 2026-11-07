@@ -1,0 +1,28 @@
+# Endless Map's public repository holds the add-on and its front page - nothing else.
+# Everything is ignored except what is listed here, so nothing else can be added by accident: the development tools,
+# tests, notes and game data live in a separate, private repository and never come here.
+
+# 1. At the top: only these.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/.github/
+!/AzerothUnrolled/
+
+# 2. .github: only the issue forms.
+/.github/**
+!/.github/**/
+!/.github/ISSUE_TEMPLATE/*.yml
+
+# 3. The add-on: only what the game loads and the documents it ships - the Lua and TOC files, its pictures (TGA, BLP),
+#    the readmes, changelogs and notices beside the TOC, and the licence.
+/AzerothUnrolled/**
+!/AzerothUnrolled/**/
+!/AzerothUnrolled/**/*.lua
+!/AzerothUnrolled/**/*.toc
+!/AzerothUnrolled/**/*.tga
+!/AzerothUnrolled/**/*.blp
+!/AzerothUnrolled/*.md
+!/AzerothUnrolled/LICENSE

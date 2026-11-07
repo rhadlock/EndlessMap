@@ -1,0 +1,34 @@
+name: Bug report
+description: Something on the map does not work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "In the game (from 1.6.1), the map menu's **Report a bug** makes a report to paste below, and a link to this form with the first two boxes filled in."
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: Which game, and its version if you know it.
+      placeholder: "WoW Forever 1.60.1.70840"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Endless Map's version
+      description: In the game's AddOns list, or at the top of the map menu.
+      placeholder: "1.6.1"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: The report from the game
+      description: "Map menu > Report a bug > Copy report, Ctrl+C, then paste it here."
+      render: text
