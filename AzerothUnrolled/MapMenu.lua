@@ -139,6 +139,12 @@ function M.Generator(_, root)
     if root.CreateDivider then root:CreateDivider() end
     if root.CreateButton then
         root:CreateButton("Slash commands", PrintCommands)
+        -- (1.6.1, Share.lua) what's new - with the link to share and a bug report - and a bug report; nothing is sent from
+        -- the game
+        if ns.Share then
+            root:CreateButton("What's new", function() ns.Share:ShowNews(false) end)
+            root:CreateButton("Report a bug", function() ns.Share:ShowReport() end)
+        end
         root:CreateButton("Reset to defaults", function() O:Reset() end)
         root:CreateButton("Hide these buttons", function() O:Set("mapButton", false) end)
     end

@@ -70,6 +70,8 @@ local function Stamp()
     end
     local old = db.loaded -- (1.4.0-beta0's RetailProbe.lua: its page's last showing, kept as it was)
     if type(old) == "table" and type(old.seen) == "table" then s.seen = old.seen end
+    -- ((1.6.1, Share.lua's What's new) the version of the last login before this one)
+    if type(old) == "table" and Plain(old.version, "string") then s.prev = old.version end
     db.loaded = s
     ns.loadStamp = s -- (1.4.0-beta0's RetailProbe.lua added what its page saw)
 end

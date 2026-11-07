@@ -1,5 +1,11 @@
 # Changelog
 
+## Endless Map 1.6.1
+
+- **What's new, in the game**: the first time you open the map after Endless Map updated, a window in the game's own style shows what changed, with Endless Map's link to share (Copy link, then Ctrl+C). Untick "Show what's new after an update" in it (or in the settings) and it stays away. The map menu's "What's new" and `/unroll news` open it any time.
+- **Report a bug**: in the same window, a ready-made report - the add-on's and the game's versions, your settings, the add-on's own errors. Copy report and Copy form link (each then Ctrl+C), open the link - Endless Map's bug form on GitHub, your game and the add-on's version already filled in - and paste the report in it. Nothing is sent from the game. In the map menu, the settings, or `/unroll bug`.
+- **The download link**: `/unroll link` shows it in your own chat window (only you see it); the What's new window has it to copy.
+
 ## Endless Map 1.6.0
 
 - **WoW Forever: quest icons from higher up** (1.6.0-beta1). Your quests, the tracked quest's way and the quests on offer show for every zone in view from world zoom 10 (`/unroll questzoom`, or the settings' "Quest icons appear") - the game's map shows a zone's quests only on that zone's own map. They look as the game draws them; hover one for what is left to do, click it to track it (again: stop tracking). `/unroll questzoom off` gives the game's own back. A click tracks a quest in combat too, as the game's icon does; while a quest's details are open in the quest log only that quest shows, as on the game's map; quest hubs show with the quests on offer they stand for coming in as you zoom in.

@@ -19,7 +19,8 @@ local P = {}
 ns.OptionsPanel = P
 
 local TITLE = ns.TITLE or "Endless Map" -- (Options.lua)
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton" } -- (1.3.0: + bubbles, imagery)
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton", -- (1.3.0: + bubbles, imagery)
+    "newsAfterUpdate" } -- (1.6.1: Share.lua's What's new)
 local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 local NONE = 0 -- (a dropdown value must be a number: stands for cityZoom = false)
 
@@ -35,7 +36,7 @@ local function Register()
     if not (St.RegisterVerticalLayoutCategory and St.RegisterProxySetting and St.RegisterAddOnCategory and St.CreateCheckbox
         and St.VarType and St.VarType.Boolean and St.VarType.Number) then return end
 
-    local category = St.RegisterVerticalLayoutCategory(TITLE)
+    local category, layout = St.RegisterVerticalLayoutCategory(TITLE)
     if not category then return end
 
     for _, key in ipairs(TOGGLES) do
@@ -74,6 +75,16 @@ local function Register()
                 if setting then St.CreateDropdown(category, setting, Options, s.tip) end
             end
         end
+    end
+
+    -- (1.6.1, Share.lua) what's new - with the link to share - and a bug report to copy; nothing is sent from the game
+    if ns.Share and type(layout) == "table" and layout.AddInitializer and CreateSettingsButtonInitializer then
+        layout:AddInitializer(CreateSettingsButtonInitializer("What's new", "Show",
+            function() ns.Share:ShowNews(false) end,
+            "What changed in this version of Endless Map, with its download link to copy and share. Nothing is sent from the game.", true))
+        layout:AddInitializer(CreateSettingsButtonInitializer("Report a bug", "Make a report",
+            function() ns.Share:ShowReport() end,
+            "A ready-made bug report - versions, settings, the add-on's errors - to copy and paste in Endless Map's bug form on GitHub. Nothing is sent from the game.", true))
     end
 
     St.RegisterAddOnCategory(category)

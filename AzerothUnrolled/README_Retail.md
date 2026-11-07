@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.6.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
+Version 1.6.1 - for **retail World of Warcraft** (12.1.5, interface 120105).
 
 One smooth zoom over the whole world map. Open the map and you are in space, on Blizzard's map of the worlds; scroll
 into any world, any continent, through the small inset maps (Argus, the Maelstrom, Nazjatar, ...) down to the centre
@@ -68,6 +68,9 @@ slash command.
 | `/emap imagery` | the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/emap imagerytiles` | the minimap imagery's closest zoom from the game's own minimap tiles: on / off (default on) |
 | `/emap cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: default 30; off = never |
+| `/emap link` | the download link in your own chat window (only you see it) |
+| `/emap news` | what's new in this version - the window that opens by itself the first time the map opens after an update - with the download link to copy and share |
+| `/emap bug` | a bug report to copy - versions, settings, the add-on's errors - and paste in Endless Map's bug form on GitHub |
 | `/emap taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/emap debug` | how the map layers are stacked (for bug reports) |
 | `/emap why` | what the map shows here and why - kept in the saved settings too (for bug reports) |

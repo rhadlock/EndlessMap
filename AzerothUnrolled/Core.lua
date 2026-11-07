@@ -2439,6 +2439,8 @@ SlashCmdList[ns.SLASH] = function(input)
         else
             Print("zoom: not available")
         end
+    elseif cmd == "link" or cmd == "news" or cmd == "bug" then -- (1.6.1, Share.lua)
+        if ns.Share then ns.Share:Slash(cmd) else Print(cmd .. ": not available") end
     elseif cmd == "follow" or cmd == "openzoom" or cmd == "openfollow" then
         if ns.Follow then ns.Follow:Slash(cmd, num, Print, arg) else Print(cmd .. ": not available") end
     elseif cmd == "taint" then

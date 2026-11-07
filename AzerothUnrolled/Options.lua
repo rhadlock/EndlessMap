@@ -181,6 +181,11 @@ if QG then
         end })
 end
 
+-- (1.6.1, Share.lua) the What's new window the first time the map opens after an update (no command: /unroll news opens
+-- the window; its own box and the Settings page switch it)
+Add({ key = "newsAfterUpdate", kind = "bool", label = "What's new after an update", said = "what's new after an update ",
+    tip = "The first time you open the map after Endless Map updated: a window with what changed, the link to share it and a button to report a bug." })
+
 -- (1.3.0, PartyBubbles.lua) you and your party in round bubbles under the map's top left button
 Add({ key = "bubbles", kind = "bool", cmd = "bubbles", label = "Party bubbles", said = "party bubbles on the map ",
     tip = "You and your party (in a raid: your group) as round portraits under the map's top left button. Hover one for the zone they are in; click it to go to them and follow them.",
@@ -228,7 +233,8 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 -- The defaults of the settings this file adds (Core.lua fills the saved table from ns.DEFAULTS on ADDON_LOADED and on
 -- /unroll reset; its own rows are in Core.lua).
 local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true, -- (1.3.0: + bubbles, imagery, imageryTiles)
-    questZoom = QG } -- (1.6.0; nil where Pins.lua is not - Classic Era)
+    questZoom = QG, -- (1.6.0; nil where Pins.lua is not - Classic Era)
+    newsAfterUpdate = true } -- (1.6.1)
 if ns.DEFAULTS then
     for k, v in pairs(OWN_DEFAULTS) do
         if ns.DEFAULTS[k] == nil then ns.DEFAULTS[k] = v end
@@ -324,6 +330,9 @@ function O:Help()
         Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
         Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
         Say(c .. " cells           toggle the zones cut to their land (off: each zone's whole picture as you near it)")
+        Say(c .. " news            what's new in this version, with the download link to copy and share")
+        Say(c .. " link            the download link, in your own chat (only you see it)")
+        Say(c .. " bug             a bug report to copy (versions, settings, errors) and where to paste it")
         return
     end
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
@@ -331,4 +340,7 @@ function O:Help()
     Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
     Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
+    Say(c .. " news            what's new in this version, with the download link to copy and share")
+    Say(c .. " link            the download link, in your own chat (only you see it)")
+    Say(c .. " bug             a bug report to copy (versions, settings, errors) and where to paste it")
 end

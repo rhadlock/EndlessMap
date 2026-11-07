@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.6.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.6.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -167,6 +167,9 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
 | `/unroll questzoom <N>`, `default`, `off` | *Forever:* the world zoom from which every zone's quest icons show: 3 to 25, default 10 (a zone's on its own map at the latest); off = the game's own, each zone's on its own map only |
+| `/unroll link` | the download link in your own chat window (only you see it) |
+| `/unroll news` | what's new in this version - the window that opens by itself the first time the map opens after an update - with the download link to copy and share |
+| `/unroll bug` | a bug report to copy - versions, settings, the add-on's errors - and paste in Endless Map's bug form on GitHub |
 | `/unroll taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/unroll debug` | how the map layers are stacked (for bug reports) |
 | `/unroll reset` | settings back to their defaults (learned doors are kept) |

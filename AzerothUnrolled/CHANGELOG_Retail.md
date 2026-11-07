@@ -1,8 +1,14 @@
 # Changelog
 
-## Endless Map 1.5.0 (in work) - retail
+## Endless Map 1.6.1 - retail
 
-- A marker's list of ways and its arcs lie over everything on the map, and a click on the list is always the list's, also over your arrow or a door. A destination's name at the map's top edge is no longer cut off.
+The first retail file since 1.4.0 (1.5.0 and 1.6.0 were WoW Forever's).
+
+- **What's new, in the game**: the first time you open the map after Endless Map updated, a window in the game's own style shows what changed, with Endless Map's link to share (Copy link, then Ctrl+C). Untick "Show what's new after an update" in it (or in the settings) and it stays away. The map menu's "What's new" and `/emap news` open it any time.
+- **Report a bug**: in the same window, a ready-made report - the add-on's and the game's versions, your settings, the add-on's own errors. Copy report and Copy form link (each then Ctrl+C), open the link - Endless Map's bug form on GitHub, your game and the add-on's version already filled in - and paste the report in it. Nothing is sent from the game. In the map menu, the settings, or `/emap bug`.
+- **The download link**: `/emap link` shows it in your own chat window (only you see it); the What's new window has it to copy.
+- A marker's list of ways and its arcs lie over everything on the map, and a click on the list is always the list's, also over your arrow or a door. A destination's name at the map's top edge is no longer cut off. (1.5.0)
+- A click on a quest icon tracks it in combat too, as the game's own icon does. While a quest's details are open in the quest log, only that quest shows on the map, as on the game's own map. (1.6.0)
 
 ## Endless Map 1.4.0 - retail
 
