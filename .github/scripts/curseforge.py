@@ -11,6 +11,8 @@ Each zip named EndlessMap-<Game>-<version>.zip (Game: Forever or Retail) becomes
   changelog     the release notes' section "## WoW Forever" / "## Retail" (with one game in the release and no such
                 headings: the whole notes), up to a line "---"
   release type  release (beta for a GitHub pre-release)
+By hand, "only" picks one game's zip (all: every zip of the release): for a game whose zip joined the release after it
+was published, without sending the other game's again (1.6.1: retail first, WoW Forever after).
 The token is the repository's Actions secret ENDLASS_MAP_CURSE, handed in as CURSEFORGE_API_TOKEN. It is never
 printed; GitHub masks it in the log as well."""
 import io
@@ -93,6 +95,9 @@ def main():
     tag = os.environ.get('TAG', '')
     send = os.environ.get('UPLOAD', '') == 'true'
     pre = os.environ.get('PRERELEASE', '') == 'true'
+    only = os.environ.get('ONLY') or 'all'
+    if only != 'all' and only not in HEADINGS:
+        sys.exit('ONLY is "%s": all, %s' % (only, ', '.join(HEADINGS)))
     if not token:
         sys.exit('no CurseForge token: the Actions secret ENDLASS_MAP_CURSE is missing or empty')
     if not tag:
@@ -119,9 +124,12 @@ def main():
     if os.environ.get('GITHUB_TOKEN'):
         gh['Authorization'] = 'Bearer ' + os.environ['GITHUB_TOKEN']
     rel = json.loads(get('https://api.github.com/repos/%s/releases/tags/%s' % (REPO, tag), gh))
-    zips = [(a, ZIP.match(a['name'])) for a in rel['assets'] if ZIP.match(a['name'])]
+    every = [(a, ZIP.match(a['name'])) for a in rel['assets'] if ZIP.match(a['name'])]
+    zips = [(a, m) for a, m in every if only == 'all' or m.group(1) == only]
     if not zips:
-        sys.exit('the release has no EndlessMap-<Forever|Retail>-<version>.zip')
+        sys.exit('the release has no EndlessMap-<%s>-<version>.zip' % ('Forever|Retail' if only == 'all' else only))
+    if only != 'all':
+        print('Only %s: %d of the release\'s %d zip(s).' % (only, len(zips), len(every)))
     plan = []
     for a, m in zips:
         game = m.group(1)
@@ -133,7 +141,7 @@ def main():
         ids = [v for v in versions if v['gameVersionTypeID'] == kinds[game]['id'] and v['name'] in wanted]
         if not ids:
             sys.exit('%s: CurseForge lists none of %s under "%s"' % (a['name'], sorted(wanted), kinds[game]['name']))
-        meta = {'changelog': changelog(rel.get('body') or '', game, len(zips)), 'changelogType': 'markdown',
+        meta = {'changelog': changelog(rel.get('body') or '', game, len(every)), 'changelogType': 'markdown',
                 'displayName': a['name'], 'gameVersions': [v['id'] for v in ids],
                 'releaseType': 'beta' if pre else 'release'}
         print('\n%s (%d bytes): TOC interfaces %s -> %s; release type %s' % (

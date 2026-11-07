@@ -15,6 +15,11 @@ on:
         description: "Really upload to CurseForge (unticked: smoke test, nothing is sent)"
         type: boolean
         default: false
+      only:
+        description: "Only this game's zip (all: every zip of the release)"
+        type: choice
+        options: [all, Forever, Retail]
+        default: all
 
 permissions:
   contents: read
@@ -32,4 +37,5 @@ jobs:
           TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
           UPLOAD: ${{ github.event_name == 'release' || inputs.upload }}
           PRERELEASE: ${{ github.event_name == 'release' && github.event.release.prerelease }}
+          ONLY: ${{ github.event_name == 'release' && 'all' || inputs.only }}
         run: python3 .github/scripts/curseforge.py
