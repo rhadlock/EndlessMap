@@ -11,7 +11,8 @@ Each zip named EndlessMap-<Game>-<version>.zip (Game: Forever or Retail) becomes
   changelog     the release notes' section "## WoW Forever" / "## Retail" (with one game in the release and no such
                 headings: the whole notes), up to a line "---"
   release type  release (beta for a GitHub pre-release)
-The token is the repository secret CURSEFORGE_API_TOKEN. It is never printed; GitHub masks it in the log as well."""
+The token is the repository's Actions secret ENDLASS_MAP_CURSE, handed in as CURSEFORGE_API_TOKEN. It is never
+printed; GitHub masks it in the log as well."""
 import io
 import json
 import os
@@ -93,7 +94,7 @@ def main():
     send = os.environ.get('UPLOAD', '') == 'true'
     pre = os.environ.get('PRERELEASE', '') == 'true'
     if not token:
-        sys.exit('the repository secret CURSEFORGE_API_TOKEN is missing')
+        sys.exit('no CurseForge token: the Actions secret ENDLASS_MAP_CURSE is missing or empty')
     if not tag:
         sys.exit('no release tag given')
     print('Release %s - %s' % (tag, 'UPLOAD to CurseForge' if send else 'smoke test: nothing will be sent'))

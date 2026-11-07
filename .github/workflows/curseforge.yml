@@ -24,10 +24,10 @@ jobs:
     if: github.repository == 'rhadlock/EndlessMap'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The release's zips to CurseForge
         env:
-          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_API_TOKEN: ${{ secrets.ENDLASS_MAP_CURSE }}
           GITHUB_TOKEN: ${{ github.token }}
           TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
           UPLOAD: ${{ github.event_name == 'release' || inputs.upload }}
