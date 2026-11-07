@@ -2,7 +2,7 @@
 
 **[Download on CurseForge](https://www.curseforge.com/wow/addons/endless-map)** · **[Watch the video](https://www.youtube.com/watch?v=KgaUoFabvK0)** · [Report a bug](https://github.com/rhadlock/EndlessMap/issues/new?template=bug_report.yml)
 
-[![The Map Blizzard Should Have Made | WoW Forever Endless Map - watch it on YouTube](https://img.youtube.com/vi/KgaUoFabvK0/maxresdefault.jpg)](https://www.youtube.com/watch?v=KgaUoFabvK0)
+[![The Map Blizzard Should Have Made | WoW Forever Endless Map - watch it on YouTube](https://img.youtube.com)](https://www.youtube.com/watch?v=KgaUoFabvK0)
 
 A seamless world map for World of Warcraft - retail and WoW Forever: one smooth zoom from the whole world to every
 zone, city and cave, every portal and boat with where it goes, real minimap terrain, and a map that follows you and
