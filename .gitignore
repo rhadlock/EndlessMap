@@ -11,10 +11,12 @@
 !/.github/
 !/AzerothUnrolled/
 
-# 2. .github: only the issue forms.
+# 2. .github: only the issue forms and the CurseForge automation (the workflow and its script).
 /.github/**
 !/.github/**/
 !/.github/ISSUE_TEMPLATE/*.yml
+!/.github/workflows/*.yml
+!/.github/scripts/*.py
 
 # 3. The add-on: only what the game loads and the documents it ships - the Lua and TOC files, its pictures (TGA, BLP),
 #    the readmes, changelogs and notices beside the TOC, and the licence.
