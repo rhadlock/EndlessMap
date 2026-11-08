@@ -11,9 +11,11 @@
 !/.github/
 !/AzerothUnrolled/
 
-# 2. .github: only the issue forms and the CurseForge automation (the workflow and its script).
+# 2. .github: only the community files (contributing, code of conduct, security policy, pull request template), the
+#    issue forms and the CurseForge automation (the workflow and its script).
 /.github/**
 !/.github/**/
+!/.github/*.md
 !/.github/ISSUE_TEMPLATE/*.yml
 !/.github/workflows/*.yml
 !/.github/scripts/*.py
