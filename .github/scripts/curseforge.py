@@ -10,7 +10,8 @@ Each zip named EndlessMap-<Game>-<version>.zip (Game: Forever or Retail) becomes
                 under that game's version type; a version CurseForge does not list stops it all before anything is sent
   changelog     the release notes' section "## WoW Forever" / "## Retail" (with one game in the release and no such
                 headings: the whole notes), up to a line "---" - sent as HTML, rendered by GitHub's Markdown renderer
-                (1.6.1's first uploads sent Markdown, and CurseForge showed their changelogs empty)
+                (1.6.1's first uploads sent Markdown and CurseForge's page showed their changelogs empty - perhaps only
+                the page, which is not proven; HTML is CurseForge's own format either way)
   release type  release (beta for a GitHub pre-release)
 By hand, "changelog_only" (e.g. Retail=9501221,Forever=9501388) gives files already on CurseForge this release's
 changelog (CurseForge's update-file) and uploads nothing; "upload" unticked makes it a smoke test too.
@@ -81,7 +82,8 @@ def changelog(notes, game, games_in_release):
 
 def to_html(md, gh):
     """The release notes' Markdown as HTML, by GitHub's own renderer (what the release page shows). 1.6.1's files went up
-    with changelogType markdown and their changelogs stayed empty on CurseForge; HTML is CurseForge's own format."""
+    with changelogType markdown and CurseForge's page showed their changelogs empty - perhaps only the page, which is not
+    proven; HTML is CurseForge's own format either way."""
     req = urllib.request.Request('https://api.github.com/markdown', method='POST',
                                  data=json.dumps({'text': md, 'mode': 'gfm'}).encode(),
                                  headers=dict(gh, **{'Content-Type': 'application/json'}))
