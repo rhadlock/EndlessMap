@@ -29,7 +29,8 @@ at their true shape over Azeroth) they stood beside their places. Here every map
     goes; while the add-on stands aside (off, Blizzard's map of a dungeon) they are Blizzard's again.
   * THE HOVER and THE CLICK: an add-on frame names the marker (its name, its description - a flight master not found yet,
     a delve's, an event's time left); a click sets the game's waypoint to it and a second takes it off
-    (C_SuperTrack.SetSuperTrackedMapPin - Blizzard's pin's own left click), at rest.
+    (C_SuperTrack.SetSuperTrackedMapPin - Blizzard's pin's own left click), at rest. (1.6.2) Every click is the click of
+    the Blizzard pin ours stands for, step by step: "The hover and the click" below.
   * (1.4.0-beta11) QUESTS the same way - the player on 1.4.0-beta9: "when we shows quests and FP's is also not consist
     across all the zones. this should be unified": every map in view its own, as Blizzard's providers pick them for that
     map (12.1.5's QuestDataProvider, WorldMap_WorldQuestDataProvider, BonusObjectiveDataProvider, QuestOfferDataProvider,
@@ -39,8 +40,9 @@ at their true shape over Azeroth) they stood beside their places. Here every map
     its map's own zoom 2 (Blizzard's map at its deepest: QuestOfferDataProviderMixin:IsSuppressionDisabled). Their look is
     Blizzard's: POIButton.lua's round button of the quest's classification under its icon (in progress, ready to turn in,
     the waypoint's arrow, a world quest's type), the offers' icons (questOfferPinData). No names printed (it.iconOnly):
-    Blizzard's map prints none; the hover names them, the click tracks the quest (C_SuperTrack.SetSuperTrackedQuestID,
-    POIButtonMixin:OnClick's) or sets the waypoint to an offer. Blizzard's quest pins hidden as the others. Never through
+    Blizzard's map prints none; the hover names them, the click is POIButtonMixin:OnClick's - (1.6.2) the quest onto the
+    quest tracker and selected (C_QuestLog.AddQuestWatch, C_SuperTrack.SetSuperTrackedQuestID) - or sets the waypoint to
+    an offer. Blizzard's quest pins hidden as the others. Never through
     QuestCache, GetQuestsOnMapCached or GetTasksOnMapCached (Blizzard's Lua caches - an entry made by the add-on would taint
     the quest tracker that reads them: Core.lua QuestSafe): the C_ calls only.
   * (1.6.0) WOW FOREVER: its map is retail's (Blizzard_WorldMap's providers, POIButton.lua - the same files), and it pins a
@@ -53,7 +55,9 @@ at their true shape over Azeroth) they stood beside their places. Here every map
     continent - from that continent's own fit (it.ownFrom) up to the switch (it.worldOff), where its zones' take over. Its flight masters (Labels.lua LoadTaxi) and points of interest
     (Blizzard's, laid out as ours) stay as they were: of Blizzard's pins only the quests' are hidden, and only while ours
     stand in - the label layer on, at rest too, the switch not off (/unroll questzoom off: Blizzard's own, as before).
-Nothing here writes a Blizzard frame but the alpha of its pins of these kinds; every call through pcall, plain values only.
+Nothing here writes a Blizzard frame but the alpha of its pins of these kinds (and, on a Shift-click while a chat box is
+open, the quest's link that Blizzard's own ChatFrameUtil puts there - as its pin's click does); every call through pcall,
+plain values only.
 ]]
 local _, ns = ...
 if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy.lua)
@@ -795,29 +799,107 @@ local function IsTracked(it)
     return ok and Num(t) and Num(id) and t == PinType(it) and id == it.info.id
 end
 
+-- ((1.6.2) The click is the click of the Blizzard pin ours stands for, step by step - the same code on WoW Forever 1.60.1
+-- (70862) and retail 12.1.5 (Gethe's wow-ui-source, branches forever and live): a quest of the log, a bonus objective and
+-- the selected quest's waypoint (QuestPinMixin's, BonusObjectivePinMixin's OnMouseClickAction: POIButtonMixin:OnClick -
+-- QuestDataProvider pins the waypoint as a quest pin), a world quest (WorldQuestPinMixin:OnMouseClickAction), an offer, a
+-- flight master, a point of interest (SuperTrackablePinMixin:OnMouseClickAction). Until 1.6.1 a quest's click only
+-- selected it (C_SuperTrack) and never put it on the quest tracker - the player on 1.6.1: "i cant click on a question
+-- mark to mark it for tracking". Of Blizzard's steps, those that run its own Lua and write it are left out and the C
+-- calls they make taken instead - run by an add-on they would taint the quest tracker (Core.lua QuestSafe): a world
+-- quest's QuestUtil.TrackWorldQuest / UntrackWorldQuest (they keep its lastTrackedQuestID and run
+-- ObjectiveTrackerManager:UpdateAll) -> C_QuestLog.AddWorldQuestWatch / RemoveWorldQuestWatch. The world quest provider's
+-- HandleClick (a spell aimed at a world quest's place) has no counterpart here.)
+local WATCH_AUTO, WATCH_MANUAL = 0, 1   -- (Enum.QuestWatchType when the enum is missing)
+local function Sound(name)
+    local id = SOUNDKIT and SOUNDKIT[name]
+    if Num(id) then Call(PlaySound, id) end
+end
+-- (QuestUtils_IsQuestWatched: a watch of any type - nil, not on the quest tracker)
+local function WatchType(id)
+    local w = C_QuestLog and Call(C_QuestLog.GetQuestWatchType, id)
+    if Num(w) then return w end
+end
+local function Shift() return Call(IsShiftKeyDown) == true end
+-- (Blizzard's first step: a modified click - Shift - while a chat box is open puts the quest's link there, its own utility)
+local function ChatLink(id)
+    return ChatFrameUtil ~= nil and Call(ChatFrameUtil.TryInsertQuestLinkForQuestID, id) == true
+end
+-- (POIButtonMixin:OnClick)
+local function ClickQuest(it)
+    local S, L, id = C_SuperTrack, C_QuestLog or {}, it.info.id
+    if IsTracked(it) then -- (self:IsSelected())
+        Sound("IG_MAINMENU_OPTION_CHECKBOX_OFF")
+        Call(S.ClearAllSuperTracked)
+        return
+    end
+    Sound("IG_MAINMENU_OPTION_CHECKBOX_ON")
+    if ChatLink(id) then return end
+    if WatchType(id) ~= nil then
+        if Shift() then
+            -- (QuestUtil.CanRemoveQuestWatch: not in the New Player Experience)
+            local U = QuestUtil
+            if not (U and U.CanRemoveQuestWatch) or Call(U.CanRemoveQuestWatch) == true then Call(L.RemoveQuestWatch, id) end
+            return
+        end
+    else
+        Call(L.AddQuestWatch, id)
+    end
+    Call(S.SetSuperTrackedQuestID, id)
+end
+-- (WorldQuestPinMixin:OnMouseClickAction)
+local function ClickWorld(it)
+    local S, L, id = C_SuperTrack, C_QuestLog or {}, it.info.id
+    if ChatLink(id) then return end
+    local E = Enum and Enum.QuestWatchType
+    local AUTO, MANUAL = (E and E.Automatic) or WATCH_AUTO, (E and E.Manual) or WATCH_MANUAL
+    local w, selected = WatchType(id), IsTracked(it)
+    if Shift() then
+        if w == MANUAL or (w == AUTO and selected) then
+            Sound("IG_MAINMENU_OPTION_CHECKBOX_OFF")
+            Call(L.RemoveWorldQuestWatch, id)
+        else
+            Sound("IG_MAINMENU_OPTION_CHECKBOX_ON")
+            Call(L.AddWorldQuestWatch, id, MANUAL)
+        end
+    elseif selected then
+        Sound("IG_MAINMENU_OPTION_CHECKBOX_OFF")
+        Call(S.SetSuperTrackedQuestID, 0)
+    else
+        Sound("IG_MAINMENU_OPTION_CHECKBOX_ON")
+        if w ~= MANUAL then Call(L.AddWorldQuestWatch, id, AUTO) end
+        Call(S.SetSuperTrackedQuestID, id)
+    end
+end
+-- (SuperTrackablePinMixin:OnMouseClickAction: the waypoint set, or taken off)
+local function ClickPin(it)
+    local S = C_SuperTrack
+    if IsTracked(it) then
+        Call(S.ClearAllSuperTracked)
+        Sound("IG_MAINMENU_OPTION_CHECKBOX_OFF")
+    else
+        Sound("IG_MAINMENU_OPTION_CHECKBOX_ON")
+        Call(S.SetSuperTrackedMapPin, PinType(it), it.info.id)
+    end
+end
+
 -- (RetailDoors.lua OnCanvasClick, a click no door took) true: the click was ours
 function PN:OnCanvasClick(button)
     if button ~= "LeftButton" or not ns.Core then return false end
     local it = PN:HitTest(ns.Core.CursorPos())
     if not it then return false end
-    -- ((1.6.0) a quest is tracked in combat too, as Blizzard's quest pin does it (POIButtonMixin:OnClick: C_SuperTrack, no
-    -- protected call) - its own pin, hidden, takes no click; another marker's waypoint waits for the fight's end)
+    -- ((1.6.0) a quest is tracked in combat too, as Blizzard's quest pin does it (POIButtonMixin:OnClick: C_SuperTrack and
+    -- (1.6.2) C_QuestLog's watches, no protected call) - its own pin, hidden, takes no click; another marker's waypoint
+    -- waits for the fight's end)
     if InCombatLockdown() and not QUEST_KINDS[it.info.kind] then return false end
-    local S = C_SuperTrack
-    if not S then return true end
-    if QUEST_KINDS[it.info.kind] then
-        -- ((1.4.0-beta11) POIButtonMixin:OnClick: a quest tracked, the tracked one let go - its watch left as it is)
-        if IsTracked(it) then
-            if S.ClearAllSuperTracked then pcall(S.ClearAllSuperTracked) end
-        elseif S.SetSuperTrackedQuestID then
-            pcall(S.SetSuperTrackedQuestID, it.info.id)
-        end
-    elseif S.SetSuperTrackedMapPin then
-        if IsTracked(it) then
-            if S.ClearSuperTrackedMapPin then pcall(S.ClearSuperTrackedMapPin) end
-        else
-            pcall(S.SetSuperTrackedMapPin, PinType(it), it.info.id)
-        end
+    if not C_SuperTrack then return true end
+    local kind = it.info.kind
+    if kind == "world" then
+        ClickWorld(it)
+    elseif QUEST_KINDS[kind] then
+        ClickQuest(it)
+    else
+        ClickPin(it)
     end
     Dirty() -- (the tracked quest's button and its waypoint change: SUPER_TRACKING_CHANGED says so too)
     return true
@@ -874,7 +956,19 @@ local function ShowTip(it)
         end
     end
     if quest then
-        lines[#lines + 1] = IsTracked(it) and "|cffffffffClick: stop tracking it|r" or "|cffffffffClick: track this quest|r"
+        -- ((1.6.2) what the click does - ClickQuest, ClickWorld: onto the quest tracker and selected; selected, a click lets
+        -- it go - it stays on the tracker -; Shift-click takes it off the tracker)
+        local w, selected = WatchType(inf.id), IsTracked(it)
+        lines[#lines + 1] = (selected and "|cffffffffClick: deselect it|r")
+            or (w ~= nil and "|cffffffffClick: select it|r") or "|cffffffffClick: track this quest|r"
+        local off
+        if inf.kind == "world" then
+            local E = Enum and Enum.QuestWatchType
+            off = w == ((E and E.Manual) or WATCH_MANUAL) or (selected and w == ((E and E.Automatic) or WATCH_AUTO))
+        else
+            off = w ~= nil and not selected
+        end
+        if off then lines[#lines + 1] = "|cffffffffShift-click: stop tracking it|r" end
     else
         lines[#lines + 1] = IsTracked(it) and "|cffffffffClick: take the waypoint off|r" or "|cffffffffClick: set the waypoint here|r"
     end

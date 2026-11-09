@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.6.2
+
+- **A click on a quest icon puts the quest on your quest tracker** (1.6.2-beta1), as the game's own icon does, and selects it. Click it again to deselect it (it stays on the tracker), Shift-click to take it off the tracker, Shift-click while typing in chat to link it. The clicks make the game's own click sounds. Since 1.6.0 a click only selected the quest.
+
 ## Endless Map 1.6.1
 
 - **What's new, in the game**: the first time you open the map after Endless Map updated, a window in the game's own style shows what changed, with Endless Map's link to share (Copy link, then Ctrl+C). Untick "Show what's new after an update" in it (or in the settings) and it stays away. The map menu's "What's new" and `/unroll news` open it any time.

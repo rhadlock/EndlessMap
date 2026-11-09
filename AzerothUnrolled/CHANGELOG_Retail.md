@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.6.2 - retail
+
+- A click on a quest icon puts the quest on your quest tracker, as the game's own icon does, and selects it. Click it again to deselect it (it stays on the tracker), Shift-click to take it off the tracker, Shift-click while typing in chat to link it. A world quest: a click tracks and selects it, Shift-click keeps it on the tracker or takes it off. Clicks on the map's icons make the game's click sounds. Until now a click only selected the quest.
+
 ## Endless Map 1.6.1 - retail
 
 The first retail file since 1.4.0 (1.5.0 and 1.6.0 were WoW Forever's).
