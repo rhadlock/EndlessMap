@@ -30,7 +30,8 @@ at their true shape over Azeroth) they stood beside their places. Here every map
   * THE HOVER and THE CLICK: an add-on frame names the marker (its name, its description - a flight master not found yet,
     a delve's, an event's time left); a click sets the game's waypoint to it and a second takes it off
     (C_SuperTrack.SetSuperTrackedMapPin - Blizzard's pin's own left click), at rest. (1.6.2) Every click is the click of
-    the Blizzard pin ours stands for, step by step: "The hover and the click" below.
+    the Blizzard pin ours stands for, step by step: "The hover and the click" below. (1.6.3) The marker under the cursor
+    takes the mouse where that Blizzard pin would - over Questie's icons as Blizzard's quest pins are: "THE MOUSE" below.
   * (1.4.0-beta11) QUESTS the same way - the player on 1.4.0-beta9: "when we shows quests and FP's is also not consist
     across all the zones. this should be unified": every map in view its own, as Blizzard's providers pick them for that
     map (12.1.5's QuestDataProvider, WorldMap_WorldQuestDataProvider, BonusObjectiveDataProvider, QuestOfferDataProvider,
@@ -766,12 +767,14 @@ end
 ---------------------------------------------------------------------------
 -- The hover and the click (at rest)
 ---------------------------------------------------------------------------
+-- (half the side of a marker's icon square for the hit test)
+local function Half(it) return (it.pic and math.max(it.pic.h, it.pic.bh or 0) / 2 or 8) + HIT_PAD end
 function PN:HitTest(x, y)
     if not (x and y) then return nil end
     local best, bd
     for _, it in ipairs(pins) do
         if it.shown and it.sx and (it.alpha or 0) >= 0.5 and not it.off then
-            local half = (it.pic and math.max(it.pic.h, it.pic.bh or 0) / 2 or 8) + HIT_PAD
+            local half = Half(it)
             local hit = (math.abs(x - it.sx) <= half and math.abs(y - it.sy) <= half)
                 or (it.x0 and x >= it.x0 and x <= it.x1 and y >= it.y0 and y <= it.y1)
             if hit then
@@ -989,12 +992,121 @@ local function OnDoor(x, y)
     if RETAIL then return ns.RetailDoors ~= nil and ns.RetailDoors.HitTest ~= nil and ns.RetailDoors:HitTest(x, y) ~= nil end
     return Labels:HitTest(x, y) ~= nil
 end
-local function Hover()
+-- (the marker the hover names: the map at rest or held, the cursor over it, no door there)
+local function Under()
     local core = ns.Core
-    local it
-    if core and core.Settled and core.Settled() and WorldMapFrame and WorldMapFrame:IsShown() and WorldMapFrame.ScrollContainer
-        and WorldMapFrame.ScrollContainer:IsMouseOver() and not OnDoor(core.CursorPos()) then
-        it = PN:HitTest(core.CursorPos())
+    if not (core and core.Settled and core.Settled() and WorldMapFrame and WorldMapFrame:IsShown() and WorldMapFrame.ScrollContainer
+        and WorldMapFrame.ScrollContainer:IsMouseOver()) then return nil end
+    local x, y = core.CursorPos()
+    if OnDoor(x, y) then return nil end
+    return PN:HitTest(x, y)
+end
+
+-- ((1.6.3) THE MOUSE: the marker under the cursor takes it where Blizzard's pin of its kind would. Blizzard's map pins are
+-- frames that take the mouse at their kind's frame level (MapCanvasPinMixin:UseFrameLevelType; Blizzard_WorldMap.lua's
+-- list, in the same order on WoW Forever 1.60.1 and retail 12.1.5 - Gethe's wow-ui-source, branches forever and live): a
+-- delve entrance, a flight point, then PIN_FRAME_LEVEL_AREA_POI - HereBeDragons' pins, at about the levels of Questie's
+-- icons, 2016-2024 (QuestieMapUtils.lua SetDrawOrder) -, above them the quests on offer, the bonus objectives, the world
+-- quests, the quests of the log, the selected quest. Ours are drawn on the label layer, which takes no mouse (level 2014),
+-- and took a click only when it reached the map itself (Core.lua OnCanvasClick): any frame that takes the mouse lay over
+-- them. The player on 1.6.2, a Questie "?" over our turn-in "?" - both tooltips showing, the click Questie's: "sorry, its
+-- still an issue", "i think this is a 3 way conflict between questie us and wow". Blizzard's quest pin, hidden while ours
+-- stand in, lay above Questie's icon and took it. So one frame takes the mouse for the marker the hover names: over its hit
+-- box (Box), at the level Blizzard's pin of that kind has (MouseLevel) - above what that pin lies above, under what lies
+-- above it -, at rest (held, the catcher has the mouse for the whole map: Core.lua). Its click is a click on the map there
+-- (Core.lua Click: OnCanvasClick, the drag's rules with it), a press on it pans the map as on the map (Core.lua
+-- OnGlobalMouseDown), right clicks go through as Blizzard's pins let them (MapCanvasPinMixin:CheckMouseButtonPassthrough).
+-- SetPassThroughButtons cannot be called in combat: the frame is made out of combat, until then the markers take no mouse,
+-- as in 1.6.2. The hover's name shows while that frame has the mouse - as Blizzard's pin's OnMouseEnter, not under a frame
+-- above it.)
+local MOUSE_LEVEL = { quest = "PIN_FRAME_LEVEL_ACTIVE_QUEST", waypoint = "PIN_FRAME_LEVEL_ACTIVE_QUEST",
+    bonus = "PIN_FRAME_LEVEL_BONUS_OBJECTIVE", world = "PIN_FRAME_LEVEL_WORLD_QUEST", offer = "PIN_FRAME_LEVEL_QUEST_OFFER",
+    hub = "PIN_FRAME_LEVEL_AREA_POI", poi = "PIN_FRAME_LEVEL_AREA_POI", event = "PIN_FRAME_LEVEL_AREA_POI_EVENT",
+    delve = "PIN_FRAME_LEVEL_DELVE_ENTRANCE", taxi = "PIN_FRAME_LEVEL_FLIGHT_POINT" }
+-- (QuestDataProvider: the selected quest's pin - its waypoint's too - at PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST;
+-- BonusObjectivePinMixin the same while selected)
+local SELECTED_LEVEL = { quest = true, waypoint = true, bonus = true }
+local mouse
+local function MouseLevel(it)
+    local kind = it.info and it.info.kind
+    local t = MOUSE_LEVEL[kind]
+    if SELECTED_LEVEL[kind] and IsTracked(it) then t = "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST" end
+    local m = t and WorldMapFrame and Call(WorldMapFrame.GetPinFrameLevelsManager, WorldMapFrame)
+    local level = m and Call(m.GetValidFrameLevel, m, t)
+    if Num(level) then return level end
+end
+-- (the hit test's box of a marker: its icon's square, with its name's box if it has one)
+local function Box(it)
+    local half = Half(it)
+    local x0, y0, x1, y1 = it.sx - half, it.sy - half, it.sx + half, it.sy + half
+    if it.x0 then
+        x0, y0, x1, y1 = math.min(x0, it.x0), math.min(y0, it.y0), math.max(x1, it.x1), math.max(y1, it.y1)
+    end
+    return x0, y0, x1, y1
+end
+local function MakeMouse()
+    if mouse or InCombatLockdown() or not (WorldMapFrame and WorldMapFrame.ScrollContainer) then return end
+    mouse = CreateFrame("Button", nil, WorldMapFrame.ScrollContainer)
+    mouse:Hide()
+    mouse:EnableMouse(true)
+    mouse:RegisterForClicks("LeftButtonUp")
+    mouse:SetPassThroughButtons("RightButton")
+    mouse:SetScript("OnClick", function(_, button)
+        if ns.Core and ns.Core.Click then ns.Core.Click(button) end
+    end)
+end
+local function Place(it)
+    if not mouse then return end
+    local level = it and it.sx and MouseLevel(it)
+    if not level then
+        if mouse:IsShown() then mouse:Hide() end
+        mouse.it = nil
+        return
+    end
+    local x0, y0, x1, y1 = Box(it)
+    if mouse.x0 ~= x0 or mouse.y0 ~= y0 or mouse.x1 ~= x1 or mouse.y1 ~= y1 then
+        mouse.x0, mouse.y0, mouse.x1, mouse.y1 = x0, y0, x1, y1
+        mouse:ClearAllPoints()
+        mouse:SetPoint("TOPLEFT", mouse:GetParent(), "TOPLEFT", x0, -y0)
+        mouse:SetSize(x1 - x0, y1 - y0)
+    end
+    if mouse.level ~= level then
+        mouse.level = level
+        ns.SetLevelFixed(mouse, level)
+    end
+    mouse.it = it
+    if not mouse:IsShown() then mouse:Show() end
+end
+-- (Core.lua OnGlobalMouseDown: a press on it is a press on the map)
+function PN:IsMouse(f) return f ~= nil and f == mouse end
+local function AtRest()
+    local core = ns.Core
+    return core ~= nil and core.State ~= nil and core.State() == "rest"
+end
+local function Focus()
+    if GetMouseFoci then
+        local foci = GetMouseFoci()
+        return type(foci) == "table" and foci[1] or nil
+    end
+    if GetMouseFocus then return GetMouseFocus() end
+end
+-- (every frame the map is open: the cursor moved, the frame goes with it - before the client next looks what the mouse is over)
+local cursorX, cursorY
+local function Point()
+    if not mouse then return end
+    local x, y = GetCursorPosition()
+    if x == cursorX and y == cursorY then return end
+    cursorX, cursorY = x, y
+    Place(AtRest() and Under() or nil)
+end
+local function Hover()
+    local it = Under()
+    if mouse then
+        -- ((1.6.3) placed again for what changed under a still cursor - a redraw, the selection; the hover the marker's while
+        -- its frame has the mouse)
+        local rest = AtRest()
+        Place(rest and it or nil)
+        if it and rest and mouse.it == it and Focus() ~= mouse then it = nil end
     end
     if it ~= hot then
         if hot then Labels:SetHot(nil) end
@@ -1020,6 +1132,7 @@ local acc = 0
 watch:SetScript("OnUpdate", function(_, elapsed)
     SyncHiding()
     if RETAIL then SyncArt() end -- ((1.6.0) Blizzard's art and exploration pin: retail's alone - WoW Forever lays them out as ours)
+    Point() -- ((1.6.3) the mouse of the marker under the cursor, every frame the cursor moves)
     acc = acc + (elapsed or 0)
     if acc < 0.05 then return end
     acc = 0
@@ -1043,7 +1156,15 @@ ev:SetScript("OnEvent", function(_, event, a1)
     if event == "QUESTLINE_UPDATE" and a1 then
         for _, M in pairs(maps) do M.requested = nil end
     end
+    -- ((1.6.3) the markers' mouse frame, made out of combat - a login in combat makes it when the fight ends)
+    if event == "PLAYER_REGEN_ENABLED" then
+        MakeMouse()
+        if mouse then ev:UnregisterEvent("PLAYER_REGEN_ENABLED") end
+        return
+    end
     if event == "PLAYER_LOGIN" then
+        MakeMouse()
+        if not mouse then ev:RegisterEvent("PLAYER_REGEN_ENABLED") end
         hooksecurefunc(Labels, "Draw", AfterDraw)
         if WorldMapFrame then
             if WorldMapFrame.AcquirePin then hooksecurefunc(WorldMapFrame, "AcquirePin", OnAcquire) end
@@ -1072,6 +1193,8 @@ ev:SetScript("OnEvent", function(_, event, a1)
                 if tip then tip:Hide() end
                 if hot then Labels:SetHot(nil) end
                 hot = nil
+                Place(nil)
+                cursorX, cursorY = nil, nil
             end)
             if WorldMapFrame:IsShown() then watch:Show() end
         end
@@ -1096,4 +1219,5 @@ end
 function PN:QuestZoom() return questG end
 
 -- (tests) the markers, the maps read, Blizzard's pins hidden
-PN.T = { pins = pins, maps = maps, hidden = hidden, Hiding = function() return hiding end, Hot = function() return hot end }
+PN.T = { pins = pins, maps = maps, hidden = hidden, Hiding = function() return hiding end, Hot = function() return hot end,
+    Mouse = function() return mouse end, Tip = function() return tip end }

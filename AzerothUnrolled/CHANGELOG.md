@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.6.3
+
+- **A quest icon with a Questie icon on it answers your click** (1.6.3-beta1). Where a Questie icon lay on one of the map's quest icons - a quest's "?" with Questie's "?" on it -, the click and the tooltip were Questie's. The map's quest icons now take the mouse as the game's own quest icons do, above Questie's: a click there selects the quest and puts it on your quest tracker, and only its own tooltip shows. Right-click still zooms out, and a drag from an icon still moves the map.
+
 ## Endless Map 1.6.2
 
 - **A click on a quest icon puts the quest on your quest tracker** (1.6.2-beta1), as the game's own icon does, and selects it. Click it again to deselect it (it stays on the tracker), Shift-click to take it off the tracker, Shift-click while typing in chat to link it. The clicks make the game's own click sounds. Since 1.6.0 a click only selected the quest.

@@ -2013,9 +2013,10 @@ local function OnGlobalMouseDown(button)
     drag.swallow = false
     if not Usable() then return end
     -- Only presses on the bare map (or our mouse catcher while it moves) pan;
-    -- presses on Questie icons or other pins behave as usual.
+    -- presses on Questie icons or other pins behave as usual. ((1.6.3) Pins.lua's mouse frame - the marker under the
+    -- cursor, at its Blizzard pin's level - is the map's: a press on one of our markers pans, as before)
     local f = MouseFocus()
-    if f ~= container and f ~= container.Child and f ~= overlay and f ~= catcher then return end
+    if f ~= container and f ~= container.Child and f ~= overlay and f ~= catcher and not (ns.Pins and ns.Pins:IsMouse(f)) then return end
     drag.pending = true
     drag.fromRest = (state == "rest")
     if state == "free" then
@@ -2192,6 +2193,9 @@ local function ExportCore()
         Cam = function() return cam, v end, -- (1.0.0, ZoomReadout.lua)
         -- (1.1.0, Follow.lua)
         CursorPos = CursorPos,
+        -- ((1.6.3, Pins.lua) a click on the frame that takes the mouse for a marker: a click on the map there - the
+        -- canvas's click handler's rules, OurClick's order)
+        Click = function(button) return OnCanvasClick(nil, button) end,
         JumpToZoom = JumpToZoom,
         FlyToZoom = FlyToZoom, -- (1.3.0, PartyBubbles.lua)
         QuestSafe = QuestSafe, -- (1.4.0-beta3, retail: RetailDoors.lua - a dungeon's map opened by a door click)
