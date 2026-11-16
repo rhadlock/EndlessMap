@@ -57,7 +57,7 @@ local ART_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local ART_TOGGLE = "Interface\\Minimap\\UI-Minimap-ZoomButton-Toggle" -- (1.3.0: the map-pin button's ActiveTexture, Blizzard_WorldMapTemplates.xml:49-55)
 
 -- The menu, top to bottom.
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout" } -- (1.3.0: + bubbles, imagery)
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapWindow" } -- (1.3.0: + bubbles, imagery; 1.7.0: + mapWindow)
 local ZOOM = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 
 local S = {} -- button, icon, caves, cavesIcon, layer, layerIcon, layerGlow, tip, tipText, dropdown (true: Blizzard's menu)
@@ -144,6 +144,10 @@ function M.Generator(_, root)
         if ns.Share then
             root:CreateButton("What's new", function() ns.Share:ShowNews(false) end)
             root:CreateButton("Report a bug", function() ns.Share:ShowReport() end)
+        end
+        -- ((1.7.0, MapWindow.lua) the map window's own reset: the game's place and size)
+        if ns.MapWindow and ns.MapWindow:Supported() then
+            root:CreateButton("Reset the map window", function() ns.MapWindow:Reset() end)
         end
         root:CreateButton("Reset to defaults", function() O:Reset() end)
         root:CreateButton("Hide these buttons", function() O:Set("mapButton", false) end)

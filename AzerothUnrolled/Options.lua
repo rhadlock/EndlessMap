@@ -223,6 +223,14 @@ Add({ key = "engineMarkers", kind = "bool", cmd = "markers",
 Add({ key = "imageryTiles", kind = "bool", cmd = "imagerytiles",
     said = function(on) return "the game's own minimap tiles in the minimap imagery " .. OnOff(on) .. (Imagery() and "" or " (WoW Forever only)") end,
     apply = Redraw })
+-- (1.7.0, MapWindow.lua) the map window moved and sized by the player: the title bar to drag, the grip at its corner;
+-- WoW Forever and retail (avail: not Classic Era's map). /unroll window reset: the game's place and size again.
+Add({ key = "mapWindow", kind = "bool", cmd = "window", label = "Move and size the map window",
+    avail = function() return ns.MapWindow ~= nil and ns.MapWindow:Supported() end,
+    tip = "Drag the map's title bar to move the window, and the grip at its lower right corner to change its width and height. The full map stays full size. Off: the game's own window.",
+    said = "moving and sizing the map window ",
+    apply = function() if ns.MapWindow then ns.MapWindow:Apply() end end })
+
 Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the map",
     tip = "The round settings, caves and imagery buttons in the map's lower right corner.", -- (1.3.0: + imagery)
     said = function(on)
@@ -234,7 +242,8 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 -- /unroll reset; its own rows are in Core.lua).
 local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true, -- (1.3.0: + bubbles, imagery, imageryTiles)
     questZoom = QG, -- (1.6.0; nil where Pins.lua is not - Classic Era)
-    newsAfterUpdate = true } -- (1.6.1)
+    newsAfterUpdate = true, -- (1.6.1)
+    mapWindow = true } -- (1.7.0)
 if ns.DEFAULTS then
     for k, v in pairs(OWN_DEFAULTS) do
         if ns.DEFAULTS[k] == nil then ns.DEFAULTS[k] = v end
@@ -296,6 +305,7 @@ function O:Reset(quiet)
     Redraw()
     if ns.MapMenu then ns.MapMenu:Apply() end
     if ns.Bubbles then ns.Bubbles:Apply() end -- (1.3.0)
+    if ns.MapWindow then ns.MapWindow:Reset(true) end -- (1.7.0: the game's place and size)
     if not quiet then Say("settings reset") end
     return true
 end
@@ -307,6 +317,11 @@ function O:Slash(cmd, arg, num)
     if cmd == "on" or cmd == "off" then return self:Set("enabled", cmd == "on") end
     if cmd == "toggle" then return self:Toggle("enabled") end
     if cmd == "reset" then return self:Reset() end
+    -- ((1.7.0) /unroll window reset: the map window's own reset - the game's place and size)
+    if cmd == "window" and arg == "reset" and ns.MapWindow and ns.MapWindow:Supported() then
+        ns.MapWindow:Reset()
+        return true
+    end
     local s = BYCMD[cmd]
     if not s then return false end
     if s.forever and not s.avail() then -- (1.4.0: on retail)
@@ -326,6 +341,7 @@ function O:Help()
         Say(c .. " flight          toggle the flight masters' names")
         Say(c .. " portals         toggle the markers of the boats, zeppelins, portals and trams (hover: where it goes; click a way: fly there)")
         Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
+        Say(c .. " window          toggle moving and sizing the map window (drag its title bar / its corner grip); window reset: the game's place and size")
         Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
         Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
         Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
@@ -338,6 +354,9 @@ function O:Help()
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
     Say(c .. " portals         toggle the markers of the boats, zeppelins, portals and trams (hover: where it goes; click a way: fly there)")
     Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
+    if ns.MapWindow and ns.MapWindow:Supported() then
+        Say(c .. " window          toggle moving and sizing the map window (drag its title bar / its corner grip); window reset: the game's place and size")
+    end
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
     Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
     Say(c .. " news            what's new in this version, with the download link to copy and share")

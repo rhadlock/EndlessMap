@@ -2232,6 +2232,8 @@ local function ExportCore()
         Click = function(button) return OnCanvasClick(nil, button) end,
         JumpToZoom = JumpToZoom,
         SwitchMap = SwitchMap, -- ((1.6.4) Portals.lua's switch to a way's map off the world map: noted as ours - standby)
+        -- ((1.7.0, MapWindow.lua) Blizzard's map fitted to a size it gave the window, under our taint: noted as ours - standby)
+        Touch = function() touched = true end,
         FlyToZoom = FlyToZoom, -- (1.3.0, PartyBubbles.lua)
         QuestSafe = QuestSafe, -- (1.4.0-beta3, retail: RetailDoors.lua - a dungeon's map opened by a door click)
         SetDoorReturn = SetDoorReturn, -- (1.4.0-beta13, retail: RetailDoors.lua)
@@ -2632,6 +2634,7 @@ local function OnInterfaceStyle()
     if ns.MapMenu then ns.MapMenu:Apply() end
     if ns.ZoomReadout then ns.ZoomReadout:Apply() end
     if ns.Bubbles and ns.Bubbles.Apply then ns.Bubbles:Apply() end
+    if ns.MapWindow then ns.MapWindow:Apply() end -- (1.7.0: the game's own window in the Gamepad UI)
     if standby and touched and not noted then
         noted = true
         Print(GAMEPAD_NOTE)

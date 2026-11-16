@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.6.1 - for **retail World of Warcraft** (12.1.5, interface 120105).
+Version 1.7.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
 
 One smooth zoom over the whole world map. Open the map and you are in space, on Blizzard's map of the worlds; scroll
 into any world, any continent, through the small inset maps (Argus, the Maelstrom, Nazjatar, ...) down to the centre
@@ -29,6 +29,9 @@ loads the new files.
   you.
 - Party bubbles: you and your party (in a raid: your group) as small round portraits in the map's top left corner.
   Hover one for the zone they are in; click it and the map flies to them and follows them.
+- Move and size the map window: drag its title bar to move it, and the grip at its lower right corner to change its
+  width and height - the map fills it. It stays where you put it, in combat too; the full map stays full size
+  (`/emap window`).
 - Minimap imagery: the map drawn from the game's own minimap pictures - the real terrain, with the fog of war - instead
   of the drawn map (the round button with the terrain picture, or `/emap imagery`; off by default).
 - Caves and interiors show their tunnels from world zoom 30 (the caves button, or `/emap cavezoom`).
@@ -64,6 +67,7 @@ slash command.
 | `/emap follow` | a click on your arrow / a party member's dot makes the map follow them: on / off (default on) |
 | `/emap openzoom <N>`, `default`, `off` | the world zoom M opens the map at, on your character: default 14; off = the game's own view |
 | `/emap openfollow` | M also follows you: on / off (default on) |
+| `/emap window` | moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/emap window reset`: the game's place and size again |
 | `/emap bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
 | `/emap imagery` | the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/emap imagerytiles` | the minimap imagery's closest zoom from the game's own minimap tiles: on / off (default on) |

@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.7.0
+
+- **Move and size the map window** (1.7.0-beta1). Drag the map's title bar to move the window, and the grip at its lower right corner to change its width and height, like any window (1.7.0-beta2) - the map fills it. It stays where you put it, in combat too, and the full map stays full size. The map menu's "Reset the map window" (or /unroll window reset) gives the game's place and size back; untick "Move and size the map window" if another add-on moves your map.
+
 ## Endless Map 1.6.4
 
 - **With the game's Gamepad UI on, the map is the game's own** (1.6.4-beta1). There, opening and closing the map could leave the controller unable to talk to an NPC, with "ADDON_ACTION_FORBIDDEN ... SetPreferredGamepadInteractTarget()" errors: Endless Map's map changes ran into the controller's own code. While the Gamepad UI is on, Endless Map now leaves the world map to the game - the game's own map and quest icons, none of Endless Map's buttons - and comes back when you turn the Gamepad UI off. Turned on after you used the map in the same session, it says once to /reload: only that clears what the map already did.

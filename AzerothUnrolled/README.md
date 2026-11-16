@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.6.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.7.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -35,6 +35,9 @@ dungeon entrance, drag across zone borders, and see the important places along t
   under the map-pin button (WoW Forever). Hover one for the zone they are in; click it and the map flies to them - out, across and
   back in - and follows them (click it again to stop). The bubble of the one followed glows; offline or dead members
   are greyed.
+- *Forever:* move and size the map window (1.7.0): drag its title bar to move it, and the grip at its lower right corner
+  to change its width and height - the map fills it. It stays where you put it, in combat too; the full map stays full
+  size (`/unroll window`).
 - *Forever:* minimap imagery: the whole world map drawn from the game's own minimap pictures - the real terrain, from
   the whole world down to the deepest zoom - instead of the drawn map (the round button left of the caves button, or
   `/unroll imagery`; off by default). Land you have not explored is greyed as you zoom in on a continent; zone, city
@@ -163,6 +166,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll follow` | a click on your arrow / a party member's dot makes the map follow them: on / off (default on) |
 | `/unroll openzoom <N>`, `default`, `off` | the world zoom M opens the map at, on your character: default 14; off = the game's own view |
 | `/unroll openfollow` | M also follows you: on / off (default on) |
+| `/unroll window` | *Forever:* moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/unroll window reset`: the game's place and size again |
 | `/unroll bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
 | `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
