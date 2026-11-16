@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.6.4 (in work) - retail
+
+- With the game's Gamepad UI on (retail's 12.1.7 brings it), the map is the game's own: Endless Map leaves the world map to the game while it is on and comes back when you turn it off - Endless Map's map changes would otherwise run into the controller's own code and stop it from talking to an NPC. (1.6.4)
+
 ## Endless Map 1.6.3 - retail
 
 - The map's icons take the mouse as the game's own icons do. A quest, world quest or offer icon with another add-on's map icon on it (HandyNotes, TomTom) answers your click and shows its own tooltip, as the game's quest icons lie above those; a flight master or point of interest stays under them, as the game's do.

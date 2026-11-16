@@ -2,7 +2,7 @@
 ## Title: Endless Map
 ## Notes: One smooth zoom over the whole world map, from space down to every zone and back. Settings: the round button on the map, or /emap.
 ## Author: Hadlock
-## Version: 1.6.3
+## Version: 1.6.4
 ## SavedVariables: EndlessMapDB
 ## X-License: GPL-3.0-or-later
 ## IconTexture: Interface\AddOns\AzerothUnrolled\Media\icon

@@ -1,5 +1,9 @@
 # Changelog
 
+## Endless Map 1.6.4
+
+- **With the game's Gamepad UI on, the map is the game's own** (1.6.4-beta1). There, opening and closing the map could leave the controller unable to talk to an NPC, with "ADDON_ACTION_FORBIDDEN ... SetPreferredGamepadInteractTarget()" errors: Endless Map's map changes ran into the controller's own code. While the Gamepad UI is on, Endless Map now leaves the world map to the game - the game's own map and quest icons, none of Endless Map's buttons - and comes back when you turn the Gamepad UI off. Turned on after you used the map in the same session, it says once to /reload: only that clears what the map already did.
+
 ## Endless Map 1.6.3
 
 - **A quest icon with a Questie icon on it answers your click** (1.6.3-beta1). Where a Questie icon lay on one of the map's quest icons - a quest's "?" with Questie's "?" on it -, the click and the tooltip were Questie's. The map's quest icons now take the mouse as the game's own quest icons do, above Questie's: a click there selects the quest and puts it on your quest tracker, and only its own tooltip shows. Right-click still zooms out, and a drag from an icon still moves the map.

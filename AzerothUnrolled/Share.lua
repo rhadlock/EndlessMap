@@ -473,6 +473,8 @@ end
 local function Due()
     local db = ns.db
     if not db or db.newsAfterUpdate == false or (InCombatLockdown and InCombatLockdown()) then return false end
+    -- ((1.6.4) the Gamepad UI on: the map is the game's - Core.lua standby; the window waits for a map opening without it)
+    if ns.Standby and ns.Standby() then return false end
     local cur, seen = Ver(Version()), Ver(db.seenVersion)
     if not (cur and seen) or seen >= cur then return false end
     local _, n = NewsLines(seen)

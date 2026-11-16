@@ -610,6 +610,7 @@ end
 local function Available()
     local db = ns.db
     return D.supported and D.built and db ~= nil and db.enabled ~= false and db.dungeons ~= false
+        and not (ns.Standby and ns.Standby()) -- ((1.6.4) the Gamepad UI on: the map is the game's - Core.lua standby)
 end
 
 local function TakeCanvas()

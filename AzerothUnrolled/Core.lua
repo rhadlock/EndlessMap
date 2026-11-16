@@ -23,6 +23,15 @@ How it stays friendly with Questie and other map addons:
     refreshes Blizzard's quest pins, which fill the quest cache the objective
     tracker reads. We only switch to maps whose quests Blizzard has cached
     itself (QuestSafe) - the tracker stays clean.
+  * (1.6.4) The game's Gamepad UI (WoW Forever's controller interface): there
+    Blizzard's map rebuilds its controller prompts on every map change, and
+    their bindings reach a protected function. A switch of ours ran that under
+    our taint - blocked, and the bindings it left stayed ours, so every later
+    one was blocked too: "[ADDON_ACTION_FORBIDDEN] AddOn 'AzerothUnrolled'
+    tried to call the protected function 'SetPreferredGamepadInteractTarget()'",
+    the controller unable to talk to an NPC. While the Gamepad UI is on, the
+    add-on stands aside (standby, below): it writes nothing into Blizzard's map
+    and draws nothing on it - the game's own map, as without the add-on.
 ]]
 
 local ADDON, ns = ...
@@ -83,7 +92,29 @@ local db
 local container, overlay, labelLayer, cityLayer, driver, catcher
 local ready = false
 local fourArgPanZoom = false
-local blizzWheelMode, wheelIsOurs
+local blizzWheelMode
+local wheelIsOurs = false -- ((1.6.4) Blizzard's until the add-on takes it: giving it back writes only after a take)
+-- (1.6.4) Standby: the game's Gamepad UI is on (C_InputInterfaceStyle - WoW Forever's controller interface). Blizzard's map
+-- then rebuilds its controller prompts at each map change (Blizzard_WorldMap.lua WorldMapMixin:OnMapChanged ->
+-- worldMapFooter:Refresh -> PromptedBindingFooter.lua RefreshBindingGroup -> GamepadMode.Deactivate/ActivateBindingGroup ->
+-- InputBindingManager.lua CheckCoreBindingActive -> MainActionBarFrame.lua UpdateActionBarFocusedState ->
+-- UpdateInteractIcons -> SetPreferredGamepadInteractTarget, protected). A switch of ours ran it under our taint: blocked,
+-- and the binding set it put on the stack stayed ours (IsOnlyCoreBindingSetActive reads the stack at every later
+-- UpdateInteractIcons - each soft target, each fight), so every later one was blocked too. In standby the add-on calls
+-- nothing that writes Blizzard's map - no SetMapID, no InstantPanAndZoom, no wheel mode -, Core is off (its layers
+-- hidden; Pins.lua, HighlightGuard.lua, Portals.lua follow its state), the modules with their own frames on the map hide
+-- them (MapMenu.lua, ZoomReadout.lua, PartyBubbles.lua, Dungeon.lua; What's new waits, Share.lua). Turned off: as before.
+-- touched: a write of ours into the map's state this session - a map ID (SwitchMap), a view (SetRealView: the canvas's scale
+-- and scroll, which the controller's click reads - MapCanvasMixin:NavigateToGamepadCursor) - stays ours until a /reload
+-- (MapCanvasMixin:SetMapID reads self.mapID before it writes it, so even the game's own switches then run under our taint):
+-- a switch to the Gamepad UI after one says so once (noted). (The wheel mode only Blizzard's wheel reads.)
+local standby, touched, noted = false, false, false
+local function GamepadUI()
+    local S, T = C_InputInterfaceStyle, Enum and Enum.InputDeviceInterfaceType
+    return S ~= nil and S.GetCurrentStyle ~= nil and T ~= nil and T.Gamepad ~= nil and S.GetCurrentStyle() == T.Gamepad
+end
+ns.Standby = function() return standby end
+local function On() return db.enabled and not standby end
 local restLevel = REST_LEVEL_FALLBACK
 local restStageCap = REST_LEVEL_FALLBACK + REST_BAND
 local labelsRestLevel = LABELS_LEVEL_REST_FALLBACK
@@ -267,7 +298,7 @@ end
 local DeepestAt = ns.DeepestMapAt
 
 local function Usable()
-    return ready and db.enabled and state ~= "off" and WorldMapFrame:IsShown() and v.W > 0
+    return ready and On() and state ~= "off" and WorldMapFrame:IsShown() and v.W > 0
 end
 
 local function MouseFocus()
@@ -282,6 +313,7 @@ end
 local function SetBlizzardWheel(ours)
     if not WorldMapFrame.SetMouseWheelZoomMode or wheelIsOurs == ours then return end
     wheelIsOurs = ours
+    -- ((1.6.4) not "touched" - see standby: only Blizzard's wheel reads the mode, no controller code)
     WorldMapFrame:SetMouseWheelZoomMode(ours and WHEEL_NONE or blizzWheelMode)
 end
 
@@ -454,6 +486,7 @@ local function ReadRealView()
 end
 
 local function SetRealView(s, P, Q)
+    touched = true -- (1.6.4: a write into Blizzard's map - see standby)
     if fourArgPanZoom then
         -- ignoreScaleRatio = true: (P, Q) is the exact new view centre.
         container:InstantPanAndZoom(s, P, Q, true)
@@ -476,6 +509,7 @@ end
 
 -- ((1.4.0-beta15, retail: RetailBench.lua) a map switch's time, in the player's client)
 local function SwitchMap(id)
+    touched = true -- (1.6.4: a write into Blizzard's map - see standby; Portals.lua switches through here too)
     local perf = ns.Perf
     if not perf then return WorldMapFrame:SetMapID(id) end
     local p0 = debugprofilestop()
@@ -1219,7 +1253,7 @@ end
 -- Adopt whatever Blizzard's map currently shows, then rest.
 local function ResyncFromReal()
     if not ready or not WorldMapFrame:IsShown() then return end
-    if not db.enabled or not UpdateView() then
+    if not On() or not UpdateView() then
         GoOff()
         return
     end
@@ -1236,7 +1270,7 @@ end
 -- that view - in combat on the map the game opened, the view kept inside it. (1.3.0: at once only where nothing was
 -- shown yet - M opens the map; a view already shown flies there, FlyToZoom.)
 local function JumpToZoom(x, y, z)
-    if not ready or not db.enabled or not WorldMapFrame:IsShown() or not UpdateView() then return false end
+    if not ready or not On() or not WorldMapFrame:IsShown() or not UpdateView() then return false end
     local world = ns.maps[ns.WORLD_MAP_ID]
     if not world then return false end
     cam.x, cam.y, cam.vw = x, y, ns.WidthForZoom(v, world, z)
@@ -1486,7 +1520,7 @@ end
 -- (PartyBubbles.lua) Go to world point (x, y) at world zoom z: a flight from the view shown. With nothing shown yet (the
 -- map just opened) or the camera off: at once (JumpToZoom). false: nothing to show it on.
 local function FlyToZoom(x, y, z)
-    if not ready or not db.enabled or not WorldMapFrame:IsShown() or not UpdateView() then return false end
+    if not ready or not On() or not WorldMapFrame:IsShown() or not UpdateView() then return false end
     if state == "off" or justShown then return JumpToZoom(x, y, z) end
     local world = ns.maps[ns.WORLD_MAP_ID]
     local t = world and FlightTarget(x, y, ns.WidthForZoom(v, world, z))
@@ -1888,7 +1922,7 @@ end
 -- from the nearest map above it the add-on draws, whole (the player on 1.4.0-beta11: "if i hit m while in an instance,
 -- zooming out will not go back to world"); where no map we may switch to shows that view, held there. true: done.
 local function LeaveOff()
-    if not (ns.SpaceAncestor and ready and db.enabled and WorldMapFrame:IsShown() and UpdateView()) then return false end
+    if not (ns.SpaceAncestor and ready and On() and WorldMapFrame:IsShown() and UpdateView()) then return false end
     if doorReturn and BackFromDoor() then return true end
     local A = ns.SpaceAncestor(WorldMapFrame:GetMapID())
     local world = ns.maps[ns.WORLD_MAP_ID]
@@ -2068,7 +2102,7 @@ end
 -- Runs before Blizzard turns a canvas click into a map switch. A click that
 -- was really the end of our drag (or lands while we drive the view) is eaten.
 local function OnCanvasClick(_, button)
-    if not ready or not db.enabled then return false end
+    if not ready or not On() then return false end
     if drag.swallow and button == "LeftButton" then return true end
     if state == "free" or state == "fly" or state == "hold" then return true end
     if state == "rest" and OurClick(button) then return true end
@@ -2079,7 +2113,7 @@ end
 -- the quest log...) becomes a smooth flight to the new map.
 local function OnMapChanged()
     if syncing or not ready or not WorldMapFrame:IsShown() then return end
-    if not db.enabled then return end
+    if not On() then return end
     if not UpdateView() then return end
     local target = ReadRealView()
     if not target then
@@ -2197,6 +2231,7 @@ local function ExportCore()
         -- canvas's click handler's rules, OurClick's order)
         Click = function(button) return OnCanvasClick(nil, button) end,
         JumpToZoom = JumpToZoom,
+        SwitchMap = SwitchMap, -- ((1.6.4) Portals.lua's switch to a way's map off the world map: noted as ours - standby)
         FlyToZoom = FlyToZoom, -- (1.3.0, PartyBubbles.lua)
         QuestSafe = QuestSafe, -- (1.4.0-beta3, retail: RetailDoors.lua - a dungeon's map opened by a door click)
         SetDoorReturn = SetDoorReturn, -- (1.4.0-beta13, retail: RetailDoors.lua)
@@ -2212,7 +2247,7 @@ local function ExportCore()
         -- (1.4.0, retail) a flight to view (x, y, vw) in the camera's own units, as a party bubble's (StartAimed): from
         -- the view shown, landing on the most detailed map that can show it; false when the map is closed or off
         FlyToView = function(x, y, vw)
-            if not ready or not db.enabled or not WorldMapFrame:IsShown() or not UpdateView() or state == "off" then return false end
+            if not ready or not On() or not WorldMapFrame:IsShown() or not UpdateView() or state == "off" then return false end
             local t = FlightTarget(x, y, math.min(vw, 1))
             if not t then return false end
             if state == "rest" then
@@ -2262,6 +2297,7 @@ end
 
 local function Setup()
     if ready or not WorldMapFrame or not WorldMapFrame.ScrollContainer then return end
+    standby = GamepadUI() -- (1.6.4: the Gamepad UI on at login - nothing of ours touches the map)
     if not ns.BuildRegistry() then
         print("|cff33ccffEndless Map|r: couldn't read the world map layout; addon disabled.")
         return
@@ -2414,7 +2450,7 @@ local function OnOff(b) return b and "|cff40ff40on|r" or "|cffff4040off|r" end
 local function Refresh()
     if not ready or not WorldMapFrame:IsShown() then return end
     if ns.Dungeon and ns.Dungeon:Refresh() then return end -- (the dungeon view owns the map)
-    if not db.enabled then
+    if not On() then
         GoOff()
     elseif state == "off" or state == "rest" then
         ResyncFromReal()
@@ -2513,6 +2549,7 @@ SlashCmdList[ns.SLASH] = function(input)
             if others then Print(others) end
         end
     else
+        if standby then Print("the Gamepad UI is on: the map is the game's own while it is (Endless Map comes back when it is off)") end -- (1.6.4)
         if ns.FLAVOR == "retail" then
             -- (1.4.0) retail: the settings it has there (no flight master labels, no dungeon maps)
             Print(("zoom %s | depth %gx | step %gx | speed %gx | labels %s (still: %s)"):format(
@@ -2574,6 +2611,33 @@ end
 ns.DEFAULTS, ns.Print, ns.Refresh = DEFAULTS, Print, Refresh
 ns.RunCommand = SlashCmdList[ns.SLASH] -- ((1.4.0-beta4) ns.COMMAND, its first slash word: OneCopy.lua)
 
+-- (1.6.4) The Gamepad UI turned on or off (INPUT_DEVICE_INTERFACE_TRANSITION; standby above). On: the add-on leaves the map
+-- to the game - an open dungeon view closes, Core goes off (its layers hidden; Pins.lua gives the game's quest icons back on
+-- the map's next frame), the map's buttons, the zoom readout and the party bubbles hide. Off: it takes the map again where
+-- it is (the dungeon view comes with the map's next opening). Switched on after a write of ours into Blizzard's map this
+-- session (touched): one chat line, once - only a /reload clears it.
+local GAMEPAD_NOTE = "the Gamepad UI is on, so the map is the game's own while it is. Endless Map had already moved the map"
+    .. " this session: type /reload once, or the game may block controller actions such as talking to an NPC."
+local function OnInterfaceStyle()
+    local now = GamepadUI()
+    if now == standby then return end
+    standby = now
+    if not ready then return end
+    if standby and ns.Dungeon and ns.Dungeon.IsActive and ns.Dungeon:IsActive() then ns.Dungeon:Exit("instant") end
+    if standby then
+        GoOff()
+    elseif WorldMapFrame:IsShown() then
+        ResyncFromReal()
+    end
+    if ns.MapMenu then ns.MapMenu:Apply() end
+    if ns.ZoomReadout then ns.ZoomReadout:Apply() end
+    if ns.Bubbles and ns.Bubbles.Apply then ns.Bubbles:Apply() end
+    if standby and touched and not noted then
+        noted = true
+        Print(GAMEPAD_NOTE)
+    end
+end
+
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
@@ -2584,8 +2648,12 @@ events:RegisterEvent("MAP_EXPLORATION_UPDATED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterEvent("GLOBAL_MOUSE_DOWN")
 events:RegisterEvent("GLOBAL_MOUSE_UP")
+-- ((1.6.4) where the game has the interface styles - WoW Forever; not retail 12.1.5 or Classic Era)
+if C_InputInterfaceStyle then events:RegisterEvent("INPUT_DEVICE_INTERFACE_TRANSITION") end
 events:SetScript("OnEvent", function(_, event, arg1)
-    if event == "GLOBAL_MOUSE_DOWN" then
+    if event == "INPUT_DEVICE_INTERFACE_TRANSITION" then
+        OnInterfaceStyle()
+    elseif event == "GLOBAL_MOUSE_DOWN" then
         if ready then OnGlobalMouseDown(arg1) end
     elseif event == "GLOBAL_MOUSE_UP" then
         if ready then OnGlobalMouseUp(arg1) end

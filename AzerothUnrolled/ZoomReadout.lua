@@ -87,7 +87,8 @@ function Z:Apply()
     if ns.Render and ns.Render.SetCityZoom then ns.Render:SetCityZoom(db.cityZoom) end
     if ns.Render and ns.Render.SetCaveZoom then ns.Render:SetCaveZoom(db.caveZoom) end -- (1.2.0)
     if ns.Pins and ns.Pins.SetQuestZoom then ns.Pins:SetQuestZoom(db.questZoom) end -- (1.6.0, WoW Forever)
-    if db.zoomReadout then
+    -- ((1.6.4) the Gamepad UI on: the map is the game's - Core.lua standby)
+    if db.zoomReadout and not (ns.Standby and ns.Standby()) then
         if Ensure() then
             frame:Show()
             self:Update()

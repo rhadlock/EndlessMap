@@ -510,6 +510,7 @@ end
 local function Wanted()
     local db = ns.db
     if not db or db.bubbles == false or db.enabled == false then return false end
+    if ns.Standby and ns.Standby() then return false end -- ((1.6.4) the Gamepad UI on: the map is the game's - Core.lua standby)
     return not (ns.Dungeon and ns.Dungeon.IsActive and ns.Dungeon:IsActive())
 end
 

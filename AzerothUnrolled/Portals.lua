@@ -448,7 +448,7 @@ local function FlyTo(way)
     -- cached itself (Core.lua QuestSafe: a switch of ours would taint them)
     if way.om then
         if InCombatLockdown() or (core.QuestSafe and not core.QuestSafe(way.om)) then return false end
-        WorldMapFrame:SetMapID(way.om)
+        core.SwitchMap(way.om) -- ((1.6.4) through Core: a write into Blizzard's map, noted as ours - Core.lua standby)
         return true
     end
     local _, v = core.Cam()

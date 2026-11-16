@@ -377,7 +377,8 @@ function M:Apply()
     Build()
     local b, c, l = S.button, S.caves, S.layer
     if not b then return end
-    if ns.db.mapButton ~= false then
+    -- ((1.6.4) the Gamepad UI on: the map is the game's - Core.lua standby; its controller cursor would land on them)
+    if ns.db.mapButton ~= false and not (ns.Standby and ns.Standby()) then
         Place()
         b:Show()
         c:SetShown(ns.FLAVOR ~= "retail" or ns.RetailCaves ~= nil) -- (1.4.0: no caves on retail; 1.4.0-beta3: RetailCaves.lua's)
