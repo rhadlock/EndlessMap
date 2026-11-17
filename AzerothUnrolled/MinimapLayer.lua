@@ -6,6 +6,9 @@ MinimapLayer (1.3.0): the world map drawn from the game's own minimap pictures -
 the drawn parchment; switched by the round button left of the caves button (MapMenu.lua), the map menu, the Settings
 page and /unroll imagery (Options.lua "imagery", default off: the drawn map stays the default look).
 
+(1.8.0) The blend: under a share of 100 (L:Share, Options.lua imageryBlend - the button's slider, MapMenu.lua) the drawn
+map shows through the imagery: Render.lua draws all of it at the drawn map's share, one level above the holder, which
+stays whole (MMBlend); Blizzard's exploration pin takes that share (PinSync).
 Everything is drawn in ONE frame, the holder: a child of Render's overlay on the overlay's own level - the level of the
 parchment's world picture, which Render leaves out while the imagery shows (Render.lua Consider, dMM) - its textures
 ordered by draw layer, bottom to top:
@@ -120,6 +123,15 @@ end
 function L:On() return ns.db ~= nil and ns.db.imagery == true and L:Supported() end
 function L:TilesOn() return ns.db ~= nil and ns.db.imageryTiles == true end -- (the client's own tiles: /unroll imagerytiles)
 function L:Active() return active end
+-- (1.8.0) The imagery's share of the map while it is on: 1 the imagery alone (imageryBlend 100, the default), less with the
+-- drawn map through it (Options.lua imageryBlend - the button's slider, MapMenu.lua); 0 while it is off. Render.lua draws
+-- the drawn map at 1 - the share over the holder; the pin below takes that share too.
+function L:Share()
+    local db = ns.db
+    if not (db and db.imagery == true) then return 0 end
+    local b = tonumber(db.imageryBlend) or 100
+    return math.max(0.05, math.min(1, b / 100))
+end
 
 local function Set(s)
     local t = {}
@@ -756,11 +768,22 @@ end
 
 ---------------------------------------------------------------------------
 -- Blizzard's exploration pin: the real map's explored parchment, drawn above our band at rest - hidden while the
--- imagery shows (its alpha only, after Blizzard's own RefreshAlpha / RefreshOverlays: a post-hook, as HighlightGuard)
+-- imagery shows (its alpha only, after Blizzard's own RefreshAlpha / RefreshOverlays: a post-hook, as HighlightGuard);
+-- (1.8.0) while the drawn map shows through the imagery, at the drawn map's share of the alpha Blizzard gives it
 ---------------------------------------------------------------------------
 local pin, pinHooked
+local pinK = 1 -- (1.8.0) the pin's share: 1 Blizzard's alpha, 0 hidden, between: the drawn map's share (L:Share)
+-- (the alpha Blizzard's RefreshAlpha gives it)
+local function PinAlpha()
+    local a = 1
+    if WorldMapFrame.GetGlobalAlpha then
+        local ok, g = pcall(WorldMapFrame.GetGlobalAlpha, WorldMapFrame)
+        if ok and type(g) == "number" then a = g end
+    end
+    return a
+end
 local function PinApply(self)
-    if pinHidden and self.SetAlpha then self:SetAlpha(0) end
+    if pinK < 1 and self.SetAlpha then self:SetAlpha(pinK > 0 and PinAlpha() * pinK or 0) end
 end
 local function PinHook()
     if pinHooked or not (WorldMapFrame and type(WorldMapFrame.dataProviders) == "table") then return end
@@ -774,20 +797,16 @@ local function PinHook()
         end
     end
 end
-local function PinSync(hide)
-    if hide == pinHidden then return end
-    pinHidden = hide
+-- k: the pin's share (1 its own alpha, 0 hidden)
+local function PinSync(k)
+    if k == pinK then return end
+    pinK, pinHidden = k, k <= 0
     if not pin then return end
-    if hide then
+    if k <= 0 then
         pin:SetAlpha(0)
     elseif not pin.isWaitingForLoad then
-        -- (the alpha Blizzard's RefreshAlpha gives it; while its overlays load, its own OnUpdate does that)
-        local a = 1
-        if WorldMapFrame.GetGlobalAlpha then
-            local ok, g = pcall(WorldMapFrame.GetGlobalAlpha, WorldMapFrame)
-            if ok and type(g) == "number" then a = g end
-        end
-        pin:SetAlpha(a)
+        -- (while its overlays load, its own OnUpdate sets its alpha; RefreshAlpha after that - PinApply)
+        pin:SetAlpha(PinAlpha() * k)
     end
 end
 function L:PinHidden() return pinHidden, pin end
@@ -894,7 +913,7 @@ end
 function L:Hide()
     if holder and holder:IsShown() then holder:Hide() end
     wipe(place)
-    PinSync(false)
+    PinSync(1)
 end
 
 local function Off()
@@ -961,7 +980,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
     lastCam = cam
     if not L:On() then
         if active or (holder and holder:IsShown()) then Off() end
-        PinSync(false)
+        PinSync(1)
         if ns.Core and ns.Core.State and ns.Core.State() == "rest" then L:RefreshPreview() end
         return false, false, false
     end
@@ -1025,7 +1044,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
     elseif not active then
         busy = true
     end
-    PinSync(active)
+    PinSync(active and 1 - L:Share() or 1) -- ((1.8.0) the drawn map's share while the imagery shows; 0: hidden)
     if active and ns.Core and ns.Core.State and ns.Core.State() == "rest" then L:RefreshPreview() end
     return active, active and backdrop, busy
 end

@@ -1,5 +1,13 @@
 # Changelog
 
+## Endless Map 1.8.0 - retail
+
+- **Travel points by how far they go**. In space, the portals to other worlds; from Azeroth's own map, the ways between its continents too; closer in, the ways within a continent, as before. Hover one for where it goes, click it to fly there.
+- **Click a travel point to keep its list open**. A click on a portal, boat or zeppelin marker with several destinations keeps its list open: move to a destination and click it to fly there. A click on the marker again, a click elsewhere on the map or moving the map closes the list.
+- **Blend the drawn map and the minimap imagery**. Rest the cursor on the imagery button and a slider comes up above it: the imagery at its top, the drawn map at its foot. Drag it, or turn the mouse wheel over it or over the button, to see the one through the other. A click on the button still switches at once, the imagery coming back at your blend; /emap blend <N> sets it too.
+- **The quest log's Back takes you back where you were**. Opening a quest in the quest log moves the map to the quest; Back left the map there. It now flies back to the place and zoom you opened the quest from; a quest on the map you were looking at moves nothing.
+- **The quest log fills a resized map window**. In a map window made taller or shorter than the game's, the page of a quest in the quest log beside the map kept the game's height, leaving an empty band below it. It now takes the window's height, its text and rewards with it.
+
 ## Endless Map 1.7.0 - retail
 
 - **Move and size the map window**. Drag the map's title bar to move the window, and the grip at its lower right corner to change its width and height, like any window - the map fills it. It stays where you put it, in combat too, and the full map stays full size. The map menu's "Reset the map window" (or /emap window reset) gives the game's place and size back; untick "Move and size the map window" if another add-on moves your map.

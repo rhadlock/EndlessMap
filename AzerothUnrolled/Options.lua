@@ -201,6 +201,17 @@ Add({ key = "imagery", kind = "bool", cmd = "imagery", label = "Minimap imagery"
         Redraw()
         if ns.MapMenu and ns.MapMenu.UpdateLayer then ns.MapMenu:UpdateLayer() end
     end })
+-- (1.8.0) How much of the minimap imagery shows while it is on, in percent: 100 the imagery alone (as before 1.8.0), less
+-- the drawn map through it - the author: "a way to blend both map types, maybe this becomes a slider, with 100% 1 way being
+-- map style 1 and 100% the other way is map style 2". The imagery button's slider sets it (MapMenu.lua); not in the menus.
+Add({ key = "imageryBlend", kind = "num", cmd = "blend", lo = 5, hi = 100, unit = "%", avail = Imagery,
+    said = function(v)
+        return ("minimap imagery at %d%% over the drawn map"):format(math.floor(v + 0.5)) .. (Imagery() and "" or " (WoW Forever only)")
+    end,
+    apply = function()
+        Redraw()
+        if ns.MapMenu and ns.MapMenu.UpdateLayer then ns.MapMenu:UpdateLayer() end
+    end })
 
 -- Slash only (not in the menus).
 Add({ key = "labels", kind = "bool", cmd = "labels", said = "place labels ",
@@ -243,7 +254,8 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true, -- (1.3.0: + bubbles, imagery, imageryTiles)
     questZoom = QG, -- (1.6.0; nil where Pins.lua is not - Classic Era)
     newsAfterUpdate = true, -- (1.6.1)
-    mapWindow = true } -- (1.7.0)
+    mapWindow = true, -- (1.7.0)
+    imageryBlend = 100 } -- (1.8.0)
 if ns.DEFAULTS then
     for k, v in pairs(OWN_DEFAULTS) do
         if ns.DEFAULTS[k] == nil then ns.DEFAULTS[k] = v end
@@ -345,6 +357,7 @@ function O:Help()
         Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
         Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
         Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
+        Say(c .. " blend <N>       how much of the imagery shows over the drawn map, 5 - 100 percent (the imagery button's slider)")
         Say(c .. " cells           toggle the zones cut to their land (off: each zone's whole picture as you near it)")
         Say(c .. " news            what's new in this version, with the download link to copy and share")
         Say(c .. " link            the download link, in your own chat (only you see it)")
@@ -359,6 +372,9 @@ function O:Help()
     end
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
     Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
+    if Imagery() then
+        Say(c .. " blend <N>       how much of the imagery shows over the drawn map, 5 - 100 percent (the imagery button's slider)")
+    end
     Say(c .. " news            what's new in this version, with the download link to copy and share")
     Say(c .. " link            the download link, in your own chat (only you see it)")
     Say(c .. " bug             a bug report to copy (versions, settings, errors) and where to paste it")

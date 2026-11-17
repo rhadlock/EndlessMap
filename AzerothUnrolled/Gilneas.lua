@@ -664,13 +664,16 @@ function G:Shown() return sets[1].a ~= nil or sets[2].a ~= nil end
 -- Per frame (Render:Draw, after its levels are planned): returns true while the page is still fading in
 ---------------------------------------------------------------------------
 -- (pfvw, pfx0 .. pfy1: Render's prefetch - the view a zoom in is heading to, its rect on the world map - or nil)
-function G:Draw(cam, v, ppx, ppy, mm, pfvw, pfx0, pfy0, pfx1, pfy1)
+-- ((1.8.0) drawn: the drawn map's share - 1 without the minimap imagery, 0 under the imagery alone, between while the drawn
+-- map shows through it: Render.lua MMBlend; the page at that share)
+function G:Draw(cam, v, ppx, ppy, drawn, pfvw, pfx0, pfy0, pfx1, pfy1)
     stats.draws = stats.draws + 1
     wants = false
     if not (host and anchor and Setup()) then return false end
     local R, cont = ns.Render, ns.maps[EK]
     local cf = R:GetContinentFocus()
-    if mm or not cont or (cf ~= nil and cf ~= EK) then
+    drawn = tonumber(drawn) or 1
+    if drawn <= 0 or not cont or (cf ~= nil and cf ~= EK) then
         G:Hide()
         return false
     end
@@ -701,7 +704,7 @@ function G:Draw(cam, v, ppx, ppy, mm, pfvw, pfx0, pfy0, pfx1, pfy1)
     local a, fade = 0, 1
     if wants and filesSet then
         fade = LoadFade(GetTime(), s)
-        a = target * fade
+        a = target * fade * drawn
     end
     if a <= 0.002 then
         G:Hide()

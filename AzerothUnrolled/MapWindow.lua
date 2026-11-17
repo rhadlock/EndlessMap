@@ -30,6 +30,14 @@ never calls it - and noted for Core.lua's /reload line (Core.Touch: a switch to 
          follow the cursor, each on its own, the top left corner staying - from 400 x 330 (the map without the quest log)
          to the screen's right and bottom edges; the text and the buttons keep their size, the map fills the window
          (Blizzard's canvas fits it)
+  quest  (1.7.1; the player on 1.7.0, a screenshot of a tall window: "the quest pannel does not resize with the window
+         changes") Blizzard's quest log beside the map is anchored at the window's top right and bottom right
+         (WorldMapMixin:AttachQuestLog), and its quest list, events and map legend fill it - but the page of one quest
+         does not: QuestMapFrame.xml sizes it for the game's window, DetailsFrame 308 x 502 and its text
+         (QuestMapDetailsScrollFrame) 298 x 430, each anchored at its top only (WoW Forever 70938 and retail 70783 the
+         same). The page and its text take the window's height over the game's, whoever sized the window - Gamepad UI
+         too (two frames' heights, no map code); the full map hides the quest log: the game's heights then. Blizzard's
+         rewards box at the page's foot works from the text's scroll range, so it fits itself.
   full   the full map (maximized) stays the game's: its own place and size; back to the window, the player's again
   off    the setting mapWindow (default on; /unroll window): no handles, the game's last place and its own size
   reset  the map menu, /unroll window reset, /unroll reset: the game's last place and size
@@ -117,6 +125,22 @@ local function Fit()
     WorldMapFrame:OnFrameSizeChanged()
 end
 
+-- (1.7.1) The quest page beside the map follows the window's height - see the header. Its heights for the game's window
+-- are the ones it has before any change of the add-on's (only the add-on changes them).
+local pageBase -- { page, text }: the quest page's and its text's heights for the game's window
+local function FitPage()
+    local f = WorldMapFrame
+    local log = f.QuestLog
+    local page = log and log.DetailsFrame
+    local text = page and page.ScrollFrame
+    if not (text and f.minimizedHeight) then return end
+    if not pageBase then pageBase = { page = page:GetHeight(), text = text:GetHeight() } end
+    -- (the full map hides the quest log - QuestLogOwnerMixin:SetDisplayState: its page as the game's then)
+    local extra = f:IsMaximized() and 0 or f:GetHeight() - f.minimizedHeight
+    if math.abs(page:GetHeight() - (pageBase.page + extra)) > 0.01 then page:SetHeight(pageBase.page + extra) end
+    if math.abs(text:GetHeight() - (pageBase.text + extra)) > 0.01 then text:SetHeight(pageBase.text + extra) end
+end
+
 local function Place(x, y, w, h)
     local f = WorldMapFrame
     if math.abs(f:GetScale() - 1) > 1e-4 then f:SetScale(1) end -- (beta1's scale: gone)
@@ -128,6 +152,7 @@ local function Place(x, y, w, h)
     f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
     ours = { x = x, y = y, w = w, h = h }
     if sized then Fit() end
+    FitPage()
 end
 
 -- (the point the window has now: the game's, unless it is the one the add-on set)
@@ -156,6 +181,7 @@ local function GiveBack()
         end
     end
     ours = nil
+    FitPage()
 end
 
 -- (beta1 saved a scale: the size it showed, read as a size)
@@ -180,6 +206,9 @@ function W:Apply()
         handle:Hide()
         grip:Hide()
         ours = nil
+        -- ((1.7.1) but the quest page keeps the window's height - the player's until the game sizes the window, then
+        -- the game's: two frames' heights, no map code)
+        FitPage()
         return
     end
     local on = Allowed()

@@ -558,7 +558,8 @@ function Labels:Draw(cam, v)
     end
 
     local n = 0
-    local mm = ns.MinimapLayer ~= nil and ns.MinimapLayer:Active() -- (1.3.0: the minimap imagery shows)
+    -- (1.3.0: the minimap imagery shows; (1.8.0) as the larger share: the drawn map through it at half or more prints its names)
+    local mm = ns.MinimapLayer ~= nil and ns.MinimapLayer:Active() and (not ns.MinimapLayer.Share or ns.MinimapLayer:Share() >= 0.5)
     -- ((1.4.0-beta15) a marker off the view - the most of over a thousand, each frame: one test, in the camera's units, the screen's margins below)
     local wx0, wx1 = cam.x + (-60 - W / 2) / ppx, cam.x + (W + 60 - W / 2) / ppx
     local wy0, wy1 = cam.y + (-20 - H / 2) / ppy, cam.y + (H + 20 - H / 2) / ppy
@@ -578,6 +579,7 @@ function Labels:Draw(cam, v)
         local sx = W / 2 + (ix - cam.x) * ppx
         local sy = H / 2 + (iy - cam.y) * ppy
         local a, own = 0, 0
+        local band -- ((1.8.0) an it.anyZoom item's zoom band: past it the item stays, its icon alone)
         if sx > -60 and sx < W + 60 and sy > -20 and sy < H + 20
             and (it.kind ~= "flight" or ns.db.flightPaths)
             and ns.db[it.style.gate or (it.style.icon and "dungeonIcons" or "placeNames")] ~= false -- (Azeroth Unrolled 1.0.0: the two halves of the layer; 1.4.0-beta3: a style's own gate)
@@ -607,6 +609,10 @@ function Labels:Draw(cam, v)
             else
                 a = AlphaFor(it.kind, ns.ZoomOf(v, it.owner, cam.vw), it.owner, v, mm or it.homemade == true)
             end
+            -- ((1.8.0: Portals.lua) it.anyZoom: at every zoom, the farthest out too - WoW Forever's ways (the player on
+            -- 1.7.1: "for forever its just map at max zoom, keep fast travel points visable"), retail's ways to another
+            -- world. The zoom no longer hides it; whatever else does still does (its map's detail open, ...)
+            if it.anyZoom then band, a = a, 1 end
             if it.zmin and a > 0 then
                 -- ((1.4.0-beta11) it.zmin: not before its map is this deep - see ZMIN_RAMP; (1.6.0) whatever its band:
                 -- WoW Forever's quest hubs' offers too)
@@ -637,6 +643,7 @@ function Labels:Draw(cam, v)
         if a > 0.03 then
             n = n + 1
             it.hereOnly = (it.here and own <= 0.03) or nil -- (1.0.0: the "you are inside" door beyond its band - its icon)
+            it.farOnly = (band and band <= 0.03) or nil -- ((1.8.0) an it.anyZoom item past its band: its icon, no name)
             it.alpha, it.sx, it.sy, it.prio = a, sx, sy, it.hereOnly and HERE_PRIO or it.style.prio
             sortBuf[n] = it
         else
@@ -699,7 +706,7 @@ function Labels:Draw(cam, v)
         local x0, x1 = cx - tw / 2 - 2, cx + tw / 2 + 2
         local y0, y1 = ty - th / 2, ty + th / 2
         if half and not it.iconKept then y1 = cy + half end -- (iconKept: the name's own rect - its icon has one already)
-        local text = not it.iconOnly and not it.hereOnly
+        local text = not it.iconOnly and not it.hereOnly and not it.farOnly
         if not text then x0, y0, x1, y1 = cx - half, cy - half, cx + half, cy + half end
         -- (1.0.0 review) a placeholder whose name the map's edge would cut (The Drowned City, at Stranglethorn's west edge)
         -- has the name moved inside the map while its icon is on it (the icon stays at its point); an icon leaving the map
@@ -747,15 +754,17 @@ function Labels:Draw(cam, v)
             it.x0, it.y0, it.x1, it.y1 = x0, y0, x1, y1
             ShowItem(it, cx, cy, ty, text, tx)
         elseif not text and (not it.style.icon or x1 < 0 or x0 > W or y1 < 0 or y0 > H
-            or (not it.here and not it.always and Overlaps(x0, y0, x1, y1, count, it.ghost, it.detail))) then
+            or (not it.here and not it.always and not it.farOnly and Overlaps(x0, y0, x1, y1, count, it.ghost, it.detail))) then
+            -- ((1.8.0) it.farOnly - the tram's door past its own zoom: a way's marker as Portals.lua's hubs, it.always - never
+            -- gives way to a name)
             HideItem(it)
-        elseif it.alpha * (1 - ((text or it.here or it.always) and soft or softA)) <= 0.03 then
+        elseif it.alpha * (1 - ((text or it.here or it.always or it.farOnly) and soft or softA)) <= 0.03 then
             HideItem(it) -- (1.0.0: all of it under a part-faded label of the city switch)
         else
             -- (1.0.0: as much of it as a part-faded label of the city switch lets through; not text: its icon's own
             -- rect was tested just above)
             -- ((1.4.0-beta11) it.always: no rect tested - softA is another item's: not this one's)
-            it.alpha = it.alpha * (1 - ((text or it.here or it.always) and soft or softA))
+            it.alpha = it.alpha * (1 - ((text or it.here or it.always or it.farOnly) and soft or softA))
             placed[count + 1], placed[count + 2], placed[count + 3], placed[count + 4] = x0, y0, x1, y1
             placedGhost[count + 1] = (it.ghost and text) and true or false
             placedSoft[count + 1] = it.soft and it.alpha or false

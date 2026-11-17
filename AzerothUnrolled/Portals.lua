@@ -8,14 +8,23 @@ graph (RETAIL_PLACES.portals: WaypointNode, WaypointEdge, WaypointSafeLocs - too
 WoW Forever, whose graph's tables are empty, the transports' stops and the portals' triggers (ns.FOREVER_WAYS: tools/ways/build_ways.py).
 
   * A HUB is the ways leaving one place (within HUB_YARDS): one marker, the character's faction's ways only. Its zoom is the zoom's alone
-    (Labels.lua it.worldOn): a hub of HUB_BIG ways or more - a capital's portal room, the world's crossroads - with the continents' pictures
-    (CONT_ON), so a wide view shows how the world connects; every other with the zones' maps (the band) - on WoW Forever, with its few ways
-    (WIDE), every hub with the continents. A click needs no fight's end: a flight moves no Blizzard frame.
+    (Labels.lua it.worldOn, it.anyZoom). (1.8.0) A player's request, through the author: "make means of travel always visible at every zoom
+    level, so we would always be able to hover over boats and other travel means ... if you are in space, then you only see the portals,
+    but as you start to zoom in on Azeroth, then all the local travel becomes visible" - and for WoW Forever, on 1.7.1: "its just map at
+    max zoom, keep fast travel points visable". WoW Forever and Classic Era (WIDE: a score of markers in the whole world, whose map is the
+    farthest view): every marker at every zoom (it.anyZoom) - the tram's doors too, their icons alone past their own zoom. Retail, by the
+    hub's REACH, its farthest way's, from the placement tree (RETAIL_TREE: a map's world is the "globe" above it, its continent the
+    "cont"): to another world (Outland, Draenor, the Shadowlands, Argus) at every zoom, space too; to another continent from a world's
+    own picture (WORLD_ALL: RetailRender.lua WORLD_ON); within its continent as before - a hub of HUB_BIG ways or more with the
+    continents' pictures (CONT_ON), every other with the zones' maps (the band). A click needs no fight's end: a flight moves no Blizzard
+    frame.
   * THE HOVER: over a marker its ways' arcs are drawn from it, dim, and its list opens beside it, a row a way and what a click does, staying
     while the cursor is on the marker, on the list or between them. The way under the cursor - the only one of a marker of one, or a row -
     brightens, sparks running along it to its end, its end's name where it leaves the view.
   * THE CLICK: on a way, a flight to its end - Core.lua FlyToView, the flight of a click on a party member (a zoom-arc flight). On a hub of
-    several the list is the choice: a click on the marker itself does nothing more.
+    several the list is the choice; (1.8.0) a click on the marker itself keeps its list open (pinned) - the author on 1.8.0-beta2, clicking
+    the marker: "if i click it does not bring up the sub menu and does not move anywehre" - till a way's click, a click elsewhere (the
+    map's own then), another marker under the cursor or the map moving; a click on the marker again closes it.
   * A DOOR THAT IS A WAY (row.door: WoW Forever's Deeprun Tram): the door's own item, not a second marker on the same spot. It keeps its icon,
     its tooltip and its click (Dungeon.lua: the tram's map); the hover adds the arc, no list (it.noList).
   * A WAY OFF THE MAP (way.om: Zephras Isle, on no place of the Azeroth map): its arc rises off the view's top, its end's name at the edge; the click
@@ -44,6 +53,7 @@ end
 
 local HUB_BIG = 3           -- a marker of so many ways is the world's crossroads: from the continents' zoom
 local WORLD_BIG = 1.75      -- (RetailRender.lua CONT_ON)
+local WORLD_ALL = 0.84      -- (1.8.0, retail) a hub with a way to another continent: from a world's own picture (RetailRender.lua WORLD_ON)
 local WIDE = ns.FLAVOR ~= "retail" -- (a score of markers in the whole world: each is a crossroads)
 local ERA = ns.FLAVOR == "era"     -- (way.nw: a route Classic Era does not have)
 local ICON, ICON_BIG = 18, 22
@@ -66,6 +76,7 @@ local layer                 -- the frame the arcs and the list lie in
 local listHit               -- the open list's mouse
 local hover                 -- the hub the hover is on
 local rowOn                 -- the way under the cursor
+local pinned                -- (1.8.0) the hub whose list a click on its marker keeps open (see THE CLICK)
 local lines, sparks, rows = {}, {}, {}
 local endText
 
@@ -75,6 +86,27 @@ local function Str(v) return type(v) == "string" and not (issecretvalue and isse
 ---------------------------------------------------------------------------
 -- The markers
 ---------------------------------------------------------------------------
+-- ((1.8.0, retail) A map's world and continent in the placement tree: the nearest "globe" and "cont" at or above it - none
+-- for a world without continents (Outland's zones, Draenor's) or a place outside every world (Argus))
+local TREE = ns.FLAVOR == "retail" and ns.RETAIL_TREE and ns.RETAIL_TREE.n
+local function Above(id, kind)
+    local guard = 0
+    while TREE and id and TREE[id] and guard < 16 do
+        if TREE[id].k == kind then return id end
+        id, guard = TREE[id].p, guard + 1
+    end
+end
+-- A hub's reach, its farthest way's: 2 to another world, 1 to another continent (a way off the map too), 0 within its continent
+local function Reach(z, ways)
+    local world, cont = Above(z, "globe"), Above(z, "cont")
+    local reach = 0
+    for _, w in ipairs(ways) do
+        if not w.om and Above(w.tz, "globe") ~= world then return 2 end
+        if w.om or Above(w.tz, "cont") ~= cont then reach = 1 end
+    end
+    return reach
+end
+
 local function Build()
     if built or not (ns.maps and ns.maps[ns.ROOT_MAP_ID]) or #Labels:Items() == 0 then return end
     built = true
@@ -93,6 +125,7 @@ local function Build()
                 for _, it in ipairs(Labels:Items()) do
                     if it.entrance == row.door then
                         it.ways, it.noList = ways, true
+                        it.anyZoom = WIDE or nil -- ((1.8.0) WoW Forever's tram: at every zoom, past its door's own its icon alone)
                         hubs[#hubs + 1] = it
                         break
                     end
@@ -109,7 +142,16 @@ local function Build()
                 if it then
                     it.style, it.pic = STYLE.portal, { file = IconFile(kind), w = size, h = size }
                     it.iconOnly, it.always, it.ways = true, true, ways
-                    it.worldOn = (big or WIDE) and WORLD_BIG or ns.RetailCells.BAND_WORLD
+                    if WIDE then
+                        it.anyZoom = true -- ((1.8.0) at every zoom, the world map too)
+                    else
+                        it.reach = Reach(row.z, ways) -- ((1.8.0) from the zoom its farthest way needs)
+                        if it.reach == 2 then
+                            it.anyZoom = true
+                        else
+                            it.worldOn = it.reach == 1 and WORLD_ALL or big and WORLD_BIG or ns.RetailCells.BAND_WORLD
+                        end
+                    end
                     hubs[#hubs + 1] = it
                 end
             end
@@ -464,11 +506,22 @@ function PT:OnCanvasClick(button)
     if not (ns.Core.Settled and ns.Core.Settled()) then return false end
     local x, y = ns.Core.CursorPos()
     local it, way = PT:HitTest(x, y)
-    if not it or it.noList then return false end -- (a door's click is the door's)
-    -- (no flight - a way off the map in combat: the list stays)
-    if way and FlyTo(way) then
-        hover, rowOn = nil, nil
-        Hide()
+    if not it or it.noList then -- (a door's click is the door's)
+        -- ((1.8.0) a click elsewhere closes a list kept open - and is the map's as ever)
+        if pinned then pinned, hover, rowOn = nil, nil, nil Hide() end
+        return false
+    end
+    if way then
+        -- (no flight - a way off the map in combat: the list stays)
+        if FlyTo(way) then
+            pinned, hover, rowOn = nil, nil, nil
+            Hide()
+        end
+    else
+        -- ((1.8.0) on the marker of several ways, or between it and its list: the list kept open till a way's click, a click
+        -- elsewhere, another marker under the cursor or the map moving; a click again closes it - the author on 1.8.0-beta2:
+        -- "if i click it does not bring up the sub menu and does not move anywehre", clicking the marker itself)
+        pinned = (pinned ~= it) and it or nil
     end
     return true -- (a hub's marker, or its list: the map's own click does nothing here)
 end
@@ -476,9 +529,17 @@ end
 local function Hover()
     local core = ns.Core
     local it, way
-    if core and core.Settled and core.Settled() and ns.db and ns.db.portals ~= false and WorldMapFrame and WorldMapFrame:IsShown()
-        and WorldMapFrame.ScrollContainer and WorldMapFrame.ScrollContainer:IsMouseOver() and not (ns.Dungeon and ns.Dungeon:IsActive()) then
+    local open = core and core.Settled and core.Settled() and ns.db and ns.db.portals ~= false and WorldMapFrame and WorldMapFrame:IsShown()
+        and WorldMapFrame.ScrollContainer and not (ns.Dungeon and ns.Dungeon:IsActive())
+    if open and WorldMapFrame.ScrollContainer:IsMouseOver() then
         it, way = PT:HitTest(core.CursorPos())
+    end
+    -- ((1.8.0) a list kept open - see PT:OnCanvasClick: it stays while the map rests and nothing else is under the cursor; another
+    -- marker under it takes the hover)
+    if pinned then
+        if not open then pinned = nil
+        elseif not it then it = pinned
+        elseif it ~= pinned then pinned = nil end
     end
     if it ~= hover then
         if hover and not hover.noList then Labels:SetHot(nil) end -- (a door's light is Dungeon.lua's)
@@ -511,7 +572,7 @@ ev:SetScript("OnEvent", function()
         WorldMapFrame:HookScript("OnShow", function() watch:Show() end)
         WorldMapFrame:HookScript("OnHide", function()
             watch:Hide()
-            hover, rowOn = nil, nil
+            hover, rowOn, pinned = nil, nil, nil
             Hide()
         end)
         if WorldMapFrame:IsShown() then watch:Show() end

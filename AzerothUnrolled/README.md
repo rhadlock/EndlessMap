@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.7.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.8.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -30,7 +30,7 @@ dungeon entrance, drag across zone borders, and see the important places along t
 - Click your arrow (or a party member's dot) and the map follows them - if they take a portal or their hearthstone,
   the map flies after them; M opens the map on your character at world zoom 14, and follows you.
 - Every boat, zeppelin, skycutter, portal and the tram of your faction (1.5.0, WoW Forever; Classic Era: the routes it has): a marker at each
-  dock from the zoom the continents fill the view. Hover one for an arc to where it goes, click a way to fly there.
+  dock, at every zoom - the whole world too (1.8.0). Hover one for an arc to where it goes, click a way to fly there.
 - Party bubbles: you and your party (in a raid: your own group) as small round portraits in the map's top left corner,
   under the map-pin button (WoW Forever). Hover one for the zone they are in; click it and the map flies to them - out, across and
   back in - and follows them (click it again to stop). The bubble of the one followed glows; offline or dead members
@@ -42,6 +42,8 @@ dungeon entrance, drag across zone borders, and see the important places along t
   the whole world down to the deepest zoom - instead of the drawn map (the round button left of the caves button, or
   `/unroll imagery`; off by default). Land you have not explored is greyed as you zoom in on a continent; zone, city
   and explored sub-zone names stay on the map; Ironforge's and Undercity's city maps still show (they are underground).
+  (1.8.0) Blend the two: rest the cursor on the imagery button and a slider comes up above it - the imagery at its top,
+  the drawn map at its foot; drag it or turn the mouse wheel over it. A click on the button still switches at once.
 - Every cave and mine of the old world (about 290) shows its tunnels from world zoom 30 - or as deep as the map goes
   over it, where that is less; Gnomeregan's tunnels, Maraudon, the Scarlet Monastery and the Timbermaw Hold tunnels
   with the city maps.
@@ -169,6 +171,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll window` | *Forever:* moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/unroll window reset`: the game's place and size again |
 | `/unroll bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
 | `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
+| `/unroll blend <N>` | *Forever:* how much of the minimap imagery shows over the drawn map, 5 - 100 percent (default 100: the imagery alone) - the imagery button's slider sets it too |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
 | `/unroll questzoom <N>`, `default`, `off` | *Forever:* the world zoom from which every zone's quest icons show: 3 to 25, default 10 (a zone's on its own map at the latest); off = the game's own, each zone's on its own map only |
 | `/unroll link` | the download link in your own chat window (only you see it) |

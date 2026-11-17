@@ -141,6 +141,11 @@ local realDirty = false
 local restBusy = false
 local focusCheckT = 0
 local hideGen = 0
+-- (1.8.0) The quest log's Back (QuestOpened, QuestReturned): questBack, the view the quest details opened from (closed: they
+-- have closed since); changeFrom, the view the last switch of Blizzard's own left (at its GetTime(), id the map it went to;
+-- off: the add-on stood aside)
+local questBack
+local changeFrom = {}
 -- Live motion: Blizzard's canvas (and its pins) follows the camera while
 -- moving. live = it is in sync this frame; liveS/P/Q = the view we gave it;
 -- liveT = GetTime() of the last sync; livePrefID/T = a better map waiting
@@ -2120,6 +2125,11 @@ local function OnMapChanged()
         GoOff()
         return
     end
+    -- ((1.8.0) the view this switch leaves - a flight's landing while it flies: a quest's details opening on their quest's
+    -- map, QuestOpened below)
+    local from = (state == "fly" and fly) and fly.target or cam
+    changeFrom.at, changeFrom.id, changeFrom.off = GetTime(), WorldMapFrame:GetMapID(), state == "off"
+    changeFrom.x, changeFrom.y, changeFrom.vw = from.x, from.y, from.vw
     if state == "off" or justShown then
         if state == "off" and not justShown and doorReturn and BackFromDoor(target.map.id) then return end
         cam.x, cam.y, cam.vw = target.x, target.y, target.vw
@@ -2151,6 +2161,49 @@ local function OnMapChanged()
         end
         EnterRest()
     end, true)
+end
+
+-- (1.8.0) The quest log's Back. A quest's details open on its map: QuestMapFrame_ShowQuestDetails keeps the map shown
+-- (returnMapID) and switches to the quest's - a flight there (OnMapChanged). Back (QuestMapFrame_ReturnFromQuestDetails)
+-- switches to the kept map again, and Blizzard shows a map whole after a switch: the flight went out to that map's whole
+-- view - a continent's when the view had rested on one. The player on 1.8.0-beta3: "hitting the back button for quests zooms
+-- you out, it should either not do anything or return you to the original location", then "hitting the back button after
+-- clicking on a quest still brings to to continent view". So Back flies to the view the details opened from: the flight its
+-- switch started turns there; at rest (the quest on the map shown: no switch) only when the view is elsewhere. Back's own
+-- end does it, because the details close inside that switch (WorldMapMixin:OnMapChanged -> QuestLogMixin:Refresh, the
+-- quest's map no longer shown), before OnMapChanged hears of it - which then cannot tell Back from any other switch.
+-- The view kept is the first opening's until the details close: QuestMapFrame_ShowQuestDetails runs again while they are open
+-- - inside its own switch (Refresh -> QuestMapFrame_UpdateAll, before OnMapChanged hears of the switch: the camera still on
+-- the view it leaves), at each quest log update, for another quest's details over these. Retail 70783 then keeps the map
+-- shown again (Back: no switch, the map stays); WoW Forever 70959 keeps the first ("SetMapID below re-enters this function,
+-- so keep the first value") - Back to the first view on both.
+local function QuestOpened()
+    if questBack and not questBack.closed then return end -- (the details still open: the first view stays)
+    questBack = nil
+    if not (ready and On() and WorldMapFrame:IsShown()) then return end
+    local f = changeFrom
+    if f.at == GetTime() and f.id == WorldMapFrame:GetMapID() then
+        if not f.off then questBack = { x = f.x, y = f.y, vw = f.vw } end -- (its switch to the quest's map, just now)
+    elseif state ~= "off" then
+        local r = (state == "fly" and fly) and fly.target or cam -- (no switch heard of yet: the camera's view - a flight's landing)
+        questBack = { x = r.x, y = r.y, vw = r.vw }
+    end
+end
+
+local function QuestClosed()
+    if questBack then questBack.closed = true end
+end
+
+local function QuestReturned()
+    local qb = questBack
+    questBack = nil
+    if not (qb and ready and On() and ns.Core and WorldMapFrame:IsShown()) or state == "off" or not UpdateView() then return end
+    if state == "rest" then
+        local real = ReadRealView()
+        if real then cam.x, cam.y, cam.vw = real.x, real.y, real.vw end
+        if not DiffersFromCam(qb) then return end -- (there: nothing to do)
+    end
+    ns.Core.FlyToView(qb.x, qb.y, qb.vw)
 end
 
 -- Maximize/minimize, the quest log panel and UI scale changes resize the map
@@ -2401,6 +2454,13 @@ local function Setup()
     SetOverlayMode(false)
 
     hooksecurefunc(WorldMapFrame, "OnMapChanged", OnMapChanged)
+    -- ((1.8.0) the quest log's Back: QuestOpened, QuestClosed, QuestReturned)
+    if type(QuestMapFrame_ShowQuestDetails) == "function" and type(QuestMapFrame_CloseQuestDetails) == "function"
+        and type(QuestMapFrame_ReturnFromQuestDetails) == "function" then
+        hooksecurefunc("QuestMapFrame_ShowQuestDetails", QuestOpened)
+        hooksecurefunc("QuestMapFrame_CloseQuestDetails", QuestClosed)
+        hooksecurefunc("QuestMapFrame_ReturnFromQuestDetails", QuestReturned)
+    end
     if WorldMapFrame.OnFrameSizeChanged then
         hooksecurefunc(WorldMapFrame, "OnFrameSizeChanged", OnFrameSizeChanged)
     end

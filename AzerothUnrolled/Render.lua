@@ -157,7 +157,11 @@ keeps the city maps only of the capitals underground (MinimapLayer.KEEP_CITY:
 Ironforge, Undercity) without their home zones' banner covers, and the detail
 levels without their parchment covers (BuildCityLod, BuildDetailLod); its
 backdrop loaded is the frame's readiness (FindCovers) and no banner is printed
-(BannerShown).
+(BannerShown). (1.8.0) The blend - the imagery button's slider, MinimapLayer:Share
+under 1: the drawn map through the imagery. Consider then keeps all of it as
+without the imagery, and every part is placed at the drawn map's share (dDrawn,
+MMBlend) one level above the holder; the detail levels and the capitals
+underground whole, as with the imagery alone; Gilneas's page at that share too.
 Gilneas (1.3.1, Gilneas.lua): the land south of Silverpine Forest that the client
 has but draws no map of. Render:Draw hands it the frame (after the levels are
 planned; not while the imagery shows); it lays its own page on the city layer's
@@ -280,6 +284,10 @@ local virt = {}                              -- [id] = virtual map entry of a de
 local xfK, xfKy, xfX, xfY                    -- Emit: layer-px transform (another map's art on a part)
 local edgeC                                  -- Emit: extra clip {x0, y0, x1, y1, feather} (a picture's edge)
 local dMM = false                            -- (1.3.0) the minimap imagery is the map's art this frame (MinimapLayer.lua)
+-- (1.8.0) the drawn map's share while the imagery shows: 0 the imagery alone (dMM as before 1.8.0), else 1 - its share
+-- (MinimapLayer:Share - the imagery button's slider): every part of the drawn map at that alpha over the holder, one level
+-- above it - but what the imagery cannot show, the detail levels and the capitals underground, whole as before
+local dDrawn, lastMode = 1, nil
 
 function Render:Init(parent)
     overlay = parent
@@ -1153,7 +1161,7 @@ local function BuildCityLod(st, h)
         local kx = lw / (X1 - X0)
         local kyr = kx * hky / ky -- (so the zone's rows land where its own picture draws them)
         -- (1.3.0: no banner covers over the minimap imagery - there is no parchment banner to cover)
-        local patches = not dMM and ns.ZoneMaskPatches and ns.ZoneMaskPatches[h.id]
+        local patches = not (dMM and dDrawn <= 0) and ns.ZoneMaskPatches and ns.ZoneMaskPatches[h.id] -- ((1.8.0) the drawn map through it: its banners)
         if patches then
             local m = NextMask(f)
             SetMaskFile(m, hcell.file)
@@ -1270,7 +1278,7 @@ local function BuildDetailLod(st)
                 if PieceShown(h.id, q) then rects[#rects + 1] = p break end
             end
         end
-        if #rects > 0 and not dMM then -- (1.3.0: none over the minimap imagery)
+        if #rects > 0 and not (dMM and dDrawn <= 0) then -- (1.3.0: none over the minimap imagery; 1.8.0: alone)
             local hw, hh, htw, hth, hfiles = BaseLayout(h.id)
             local list
             if cv.explored then list = ExploredList(h.id) else list = AllOverlays(h.id) end
@@ -1612,11 +1620,18 @@ local function Consider(e)
     end
     -- (1.3.0) The minimap imagery (MinimapLayer.lua) is the map's art: no parchment base, cell, piece or core, no banner
     -- cover; the detail levels as they are and the city maps of the capitals the surface imagery cannot show (KEEP_CITY)
+    -- ((1.8.0) the drawn map through it - dDrawn: all of it as without the imagery, placed at that share (mmK); a kept
+    -- capital's base and city map whole (keepK), as with the imagery alone)
+    local mmK, keepK = 1, 1
     if dMM and not e.virtual then
         local keep = ns.MinimapLayer.KEEP_CITY[e.id]
-        if not keep then baseA, loadBase = 0, false end
-        if lodRole == "home" or not keep then lodRole, lodL, loadLod = nil, 0, false end
-        footA, pieceA, loadFoot, loadPieces, loadCore = 0, 0, false, false, false
+        if dDrawn <= 0 then
+            if not keep then baseA, loadBase = 0, false end
+            if lodRole == "home" or not keep then lodRole, lodL, loadLod = nil, 0, false end
+            footA, pieceA, loadFoot, loadPieces, loadCore = 0, 0, false, false, false
+        else
+            mmK, keepK = dDrawn, keep and 1 or dDrawn
+        end
     end
     if not onScreen then
         -- (1.0.0) A city / detail map within one view of the screen: its patch - and a capital's cell in the mosaic -
@@ -1637,6 +1652,7 @@ local function Consider(e)
     it.baseA, it.footA, it.pieceA = baseA, footA, pieceA
     it.loadBase, it.loadFoot, it.loadPieces = loadBase, loadFoot, loadPieces
     it.loadCore, it.lod = loadCore, lod
+    it.mmK, it.keepK = mmK, keepK -- (1.8.0)
     it.sx0, it.sy0, it.sx1, it.sy1 = sx0, sy0, sx1, sy1
     it.focused = (e.id == focusID)
     it.whole = kind ~= "zone" or WholePicture(e) -- (1.0.1: does its base draw?)
@@ -2232,6 +2248,19 @@ end
 
 -- Returns true while something is still animating on its own (art loading,
 -- fading in, crossfades, deferred builds) so another frame is needed.
+-- (1.8.0) Once the imagery has drawn (dMM): the drawn map's share this frame (dDrawn). Returns the imagery alone; the levels'
+-- lift (1: the drawn map over the imagery's holder); the drawn map's share for Gilneas's page (1 without the imagery). A
+-- switch between the imagery alone and the drawn map through it has the city and detail levels made again: their covers
+-- are for one or the other (BuildCityLod's banner patches, BuildDetailLod's parchment rects).
+local function MMBlend()
+    dDrawn = dMM and (1 - ns.MinimapLayer:Share()) or 1
+    if dDrawn < 0.001 then dDrawn = 0 end
+    local mode = dMM and (dDrawn <= 0 and "alone" or "through") or nil
+    if mode and lastMode and mode ~= lastMode then Render:MarkArtDirty() end
+    lastMode = mode
+    return mode == "alone", mode == "through" and 1 or 0, dDrawn
+end
+
 function Render:Draw(cam, v)
     tick = tick + 1
     local now = GetTime()
@@ -2256,8 +2285,9 @@ function Render:Draw(cam, v)
     local mmReady, mmBusy = false, false
     dMM = false
     if ns.MinimapLayer then dMM, mmReady, mmBusy = ns.MinimapLayer:Draw(cam, v, dppx, dppy, overlay, pfvw, pfx0, pfy0, pfx1, pfy1) end
+    local mmAlone, mmLift, mmDrawn = MMBlend() -- (1.8.0: the drawn map through the imagery - see dDrawn)
     if mmBusy then dbusy = true end
-    if dMM then dfocusReady = true end -- (no zone picture to wait for: the focus changes at once)
+    if mmAlone then dfocusReady = true end -- (no zone picture to wait for: the focus changes at once)
     CityFades(ddt)
 
     local world = ns.maps[ns.WORLD_MAP_ID]
@@ -2293,15 +2323,18 @@ function Render:Draw(cam, v)
     local coverAll, coverWorld = FindCovers(n, world, mmReady)
 
     local footMax, pieceMax = PlanLevels(n, coverAll)
-    local baseLevel = overlay:GetFrameLevel() -- the overlay itself draws nothing
+    -- the overlay itself draws nothing; ((1.8.0) one level up while the drawn map shows through the imagery: above its
+    -- holder, which lies on the overlay's level - MinimapLayer.lua)
+    local baseLevel = overlay:GetFrameLevel() + mmLift
     local lvFoot = baseLevel + LV_FOOT
     local lvPieces = lvFoot + footMax + 1
     local lvPics = PlanCores(n, lvPieces + pieceMax + 1)
     PicTops(lvPics)
     LiftPictures()
-    -- (1.3.1) Gilneas's page (Gilneas.lua): on the city layer, faded in with the cells; not while the imagery shows;
+    -- (1.3.1) Gilneas's page (Gilneas.lua): on the city layer, faded in with the cells; not while the imagery shows alone
+    -- ((1.8.0) through it: at the drawn map's share);
     -- (1.3.1 review) after the levels are planned - detached it takes the one PicTops kept for it
-    if ns.Gilneas and ns.Gilneas:Draw(cam, v, dppx, dppy, dMM, pfvw, pfx0, pfy0, pfx1, pfy1) then dbusy = true end
+    if ns.Gilneas and ns.Gilneas:Draw(cam, v, dppx, dppy, mmDrawn, pfvw, pfx0, pfy0, pfx1, pfy1) then dbusy = true end
 
     wipe(used)
     for i = 1, n do
@@ -2319,13 +2352,13 @@ function Render:Draw(cam, v)
                     else lv = it.picLevel or lvFoot end -- (no level: invisible, still loading)
                     if kind == "zone" then SetRing(st.base, it.ringA) end
                     used[st.base] = true
-                    Place(st.base, it, scale, it.baseA, lv, it.lifted and liftHi)
+                    Place(st.base, it, scale, it.baseA * it.keepK, lv, it.lifted and liftHi)
                     if kind == "zone" and it.baseU > 0.002 then picVis[it.e.id] = tick end
                 end
             end
             if kind == "zone" and it.picLevel and st.hasTop and st.top.n > 0 then
                 used[st.top] = true
-                Place(st.top, it, scale, it.topA, it.picLevel + 1, it.lifted and liftHi)
+                Place(st.top, it, scale, it.topA * it.mmK, it.picLevel + 1, it.lifted and liftHi)
                 if not it.whole and it.topA > 0.002 then picVis[it.e.id] = tick end -- (1.0.1: its top is its picture)
             end
             if it.lodLevel then
@@ -2338,13 +2371,13 @@ function Render:Draw(cam, v)
                     SetRing(st.lod, it.ringA)
                 end
                 used[st.lod] = true
-                Place(st.lod, it, scale, a, it.lodLevel, it.lodLifted and liftHi)
+                Place(st.lod, it, scale, a * it.keepK, it.lodLevel, it.lodLifted and liftHi)
                 st.lod.drawA, st.lod.sx0, st.lod.sy0, st.lod.sx1, st.lod.sy1 = a, it.sx0, it.sy0, it.sx1, it.sy1
                 if a > 0.002 then cityLVis[it.lodCity] = tick end
             end
             if kind == "continent" and it.coreLevel then
                 used[st.core] = true
-                Place(st.core, it, scale, it.coreT, it.coreLevel)
+                Place(st.core, it, scale, it.coreT * it.mmK, it.coreLevel)
             end
             if kind == "zone" and not coverAll then
                 local c = ContinentOf(it.e)
@@ -2352,12 +2385,12 @@ function Render:Draw(cam, v)
                 if st.hasFoot and it.loadFoot and st.foot.n > 0 then
                     used[st.foot] = true
                     SetOuter(st.foot, keep, it.patchA)
-                    Place(st.foot, it, scale, it.footOff and it.footA / keep or it.footA, lvFoot + (it.footOff or 0))
+                    Place(st.foot, it, scale, (it.footOff and it.footA / keep or it.footA) * it.mmK, lvFoot + (it.footOff or 0))
                 end
                 if st.hasPieces and it.loadPieces and st.pieces.n > 0 then
                     used[st.pieces] = true
                     SetOuter(st.pieces, keep, it.patchA)
-                    Place(st.pieces, it, scale, it.pieceOff and it.pieceA / keep or it.pieceA,
+                    Place(st.pieces, it, scale, (it.pieceOff and it.pieceA / keep or it.pieceA) * it.mmK,
                         it.pieceOff and (lvPieces + it.pieceOff) or lvFoot)
                 end
             end
@@ -2430,7 +2463,7 @@ end
 -- pictures print it; Durotar's, Mulgore's and Tirisfal's only with the explored piece that lies over the banner.
 Render.BANNER_IN_BASE = { [1426] = true, [1429] = true, [1438] = true }
 function Render.BannerShown(h)
-    if dMM then return false end -- (1.3.0: the minimap imagery prints no banner)
+    if dMM and dDrawn <= 0 then return false end -- (1.3.0: the minimap imagery prints no banner; 1.8.0: alone)
     local t = Render.bannerOn
     if not t then
         t = {}

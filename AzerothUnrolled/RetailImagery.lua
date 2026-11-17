@@ -136,6 +136,15 @@ function I:Supported() return next(D.packs) ~= nil end
 function I:On() return ns.db ~= nil and ns.db.imagery == true end
 function I:TilesOn() return ns.db ~= nil and ns.db.imageryTiles == true end
 function I:Active() return active end
+-- (1.8.0) The imagery's share while it is on: 1 alone (imageryBlend 100, the default), less with the drawn map through it
+-- (Options.lua imageryBlend - the button's slider, MapMenu.lua); 0 off. I:Fade keeps every drawn picture at 1 - the share at
+-- least, the space fill takes the imagery's sea at the share, the pin the drawn map's share (WoW Forever's MinimapLayer:Share)
+function I:Share()
+    local db = ns.db
+    if not (db and db.imagery == true) then return 0 end
+    local b = tonumber(db.imageryBlend) or 100
+    return math.max(0.05, math.min(1, b / 100))
+end
 
 ---------------------------------------------------------------------------
 -- The data: a game map's pages, tiles and masks (parsed once)
@@ -992,10 +1001,20 @@ end
 
 ---------------------------------------------------------------------------
 -- Blizzard's exploration pin: the real map's explored parchment, drawn above our band at rest - at alpha 0 while the
--- imagery shows (its alpha only, after Blizzard's own RefreshAlpha / RefreshOverlays: a post-hook, as MinimapLayer.lua)
+-- imagery shows (its alpha only, after Blizzard's own RefreshAlpha / RefreshOverlays: a post-hook, as MinimapLayer.lua);
+-- (1.8.0) while the drawn map shows through the imagery, at the drawn map's share of the alpha Blizzard gives it
 ---------------------------------------------------------------------------
+local pinK = 1 -- (1.8.0) the pin's share: 1 Blizzard's alpha, 0 hidden, between: the drawn map's share (I:Share)
+local function PinAlpha()
+    local a = 1
+    if WorldMapFrame.GetGlobalAlpha then
+        local ok, g = pcall(WorldMapFrame.GetGlobalAlpha, WorldMapFrame)
+        if ok and Plain(g, "number") then a = g end
+    end
+    return a
+end
 local function PinApply(self)
-    if pinHidden and self.SetAlpha then self:SetAlpha(0) end
+    if pinK < 1 and self.SetAlpha then self:SetAlpha(pinK > 0 and PinAlpha() * pinK or 0) end
 end
 local function PinHook()
     if pinHooked or not (WorldMapFrame and type(WorldMapFrame.dataProviders) == "table") then return end
@@ -1009,19 +1028,15 @@ local function PinHook()
         end
     end
 end
-local function PinSync(hide)
-    if hide == pinHidden then return end
-    pinHidden = hide
+-- k: the pin's share (1 its own alpha, 0 hidden)
+local function PinSync(k)
+    if k == pinK then return end
+    pinK, pinHidden = k, k <= 0
     if not pin then return end
-    if hide then
+    if k <= 0 then
         pin:SetAlpha(0)
     elseif not pin.isWaitingForLoad then
-        local a = 1
-        if WorldMapFrame.GetGlobalAlpha then
-            local ok, g = pcall(WorldMapFrame.GetGlobalAlpha, WorldMapFrame)
-            if ok and Plain(g, "number") then a = g end
-        end
-        pin:SetAlpha(a)
+        pin:SetAlpha(PinAlpha() * k)
     end
 end
 function I:PinHidden() return pinHidden, pin end
@@ -1121,7 +1136,7 @@ function I:Hide()
         end
     end
     wipe(shownH)
-    PinSync(false)
+    PinSync(1)
 end
 
 -- (a world's switch: on at IMG_ON once its hosts' backdrops in view are there, off below IMG_OFF - going out once the
@@ -1524,7 +1539,7 @@ function I:Frame(cam, v, pf, ov)
     end
     if copiesShort then busy = true end
     active = any
-    PinSync(active)
+    PinSync(active and 1 - I:Share() or 1) -- ((1.8.0) the drawn map's share while the imagery shows; 0: hidden)
     if ns.Core and ns.Core.State and ns.Core.State() == "rest" then I:RefreshPreview() end
     if active and ns.Labels and ns.Labels.AddSubzones then ns.Labels:AddSubzones() end
     return busy
@@ -1566,6 +1581,13 @@ local function Kept(e)
     if e.kind == "cell" then return e.cell ~= nil and e.cell.pt ~= nil and Keep(e.cellOf) end
     return e.kind == "zone" and Keep(e)
 end
+-- ((1.8.0) the drawn map through the imagery: no drawn picture under the drawn map's share, 1 - I:Share - the switch
+-- fades the drawn pictures out over the holders down to it, and loads them on (I:Hides))
+local function Through(f)
+    local sh = I:Share()
+    if sh <= 0 or sh >= 1 then return f end -- (off - the switch going out as before -, or the imagery alone)
+    return f < 1 - sh and 1 - sh or f
+end
 function I:Fade(e)
     if e.kind == "root" then return 1 end
     local s = worlds[WorldOf(e) or e]
@@ -1576,13 +1598,13 @@ function I:Fade(e)
         -- with its own HOST_FADE, keeps the drawn picture over it as much; not the whole world's pictures back at once, as
         -- the first build did when any host of the view was not ready)
         local h = CoverHost(e)
-        if not h then return coverOf[e] == false and 1 or 0 end
+        if not h then return Through(coverOf[e] == false and 1 or 0) end
         if h.tick ~= V.tick then return 1 end
-        return 1 - ((h.backdrop and h.ra) or 0)
+        return Through(1 - ((h.backdrop and h.ra) or 0))
     end
     -- (the switch's first half brings the holders in whole under the drawn pictures - DrawHost: 2 x its alpha -, its
     -- second half fades the drawn pictures out over them; going out the other way round)
-    return 1 - math.max(0, 2 * s.ea - 1)
+    return Through(1 - math.max(0, 2 * s.ea - 1))
 end
 function I:Hides(e) return I:Fade(e) <= 0 end
 
@@ -1592,7 +1614,7 @@ function I:SpaceSea(W)
     local s = worlds[W]
     if not (s and s.ea > 0) then return nil, 0 end
     local d = D.hosts[W.id] or (W.id == ns.WORLD_MAP_ID and D.hosts[12]) or nil
-    return d and d.sea or nil, s.ea
+    return d and d.sea or nil, s.ea * I:Share() -- ((1.8.0) the drawn map through it: the sea at the imagery's share)
 end
 
 -- (RetailRender.lua) The imagery covers the view: the world under the view's centre whole, its hosts loaded - the frame is

@@ -29,6 +29,14 @@ the minimap imagery (MinimapLayer.lua).
     view's centre - the minimap there while the drawn map shows, the drawn map while the imagery shows (MinimapLayer.lua
     sets it, at rest) - and it wears the map-pin button's own toggled glow (UI-Minimap-ZoomButton-Toggle) while the
     imagery is on. A click switches (Options.lua imagery). WoW Forever only: elsewhere it hides.
+  * (1.8.0) The blend slider - the author: "a way to blend both map types, maybe this becomes a slider, with 100% 1 way
+    being map style 1 and 100% the other way is map style 2, so you click the button, and it brings up a vertical slider
+    ... i still want to quick change the styles". As a volume control: the cursor resting on the imagery button (SL_SHOW)
+    brings up a vertical slider above it - the minimap imagery at its top, the drawn map at its foot, the share between.
+    A press or a drag on it and the mouse wheel over it or the button set the share (Options.lua imageryBlend, 5 - 100
+    percent, the imagery on; at the foot the imagery off, its share as before the drag); a click on the button still
+    switches between the two at once, the imagery back at its share. It goes once the cursor has left both (SL_HIDE), with
+    the map, with the buttons. The hover text moves left of it.
   * Every item goes through ns.Options (Options.lua), quietly: the tick (the icon) is the answer. Nothing here is
     protected, nothing touches a Blizzard frame, GameTooltip stays untouched (the hover text is an addon frame, as
     Dungeon.lua's).
@@ -189,8 +197,18 @@ end
 ---------------------------------------------------------------------------
 local function ImageryOn() return ns.Options:Get("imagery") == true end
 
+-- (1.8.0) the imagery's share now: 0 the drawn map alone, 1 the imagery alone (MinimapLayer:Share's)
+local function Blend()
+    if not ImageryOn() then return 0 end
+    local b = tonumber(ns.Options:Get("imageryBlend")) or 100
+    return math.max(0.05, math.min(1, b / 100))
+end
+
 local function LayerTip()
-    return ImageryOn() and "Minimap imagery - click for the drawn map" or "Drawn map - click for the minimap imagery"
+    local b = Blend()
+    if b <= 0 then return "Drawn map - click for the minimap imagery" end
+    if b >= 1 then return "Minimap imagery - click for the drawn map" end
+    return ("Minimap imagery at %d%% - click for the drawn map"):format(math.floor(b * 100 + 0.5))
 end
 
 -- Its picture (MinimapLayer.lua): file and texcoords (a part of a map tile or of a composite), or colour {r, g, b}
@@ -206,6 +224,23 @@ function M:SetLayerPicture(file, rgb, l, r, t, b)
     end
 end
 
+-- (1.8.0) the slider's thumb, fill and number at the share now
+local SL_W, SL_H = 48, 170          -- the slider's panel
+local SL_TRACK, SL_TOP = 108, 36    -- its track's length, the track's top from the panel's top
+local SL_SHOW, SL_HIDE = 0.2, 0.4   -- seconds: the cursor on the button before it comes, off both before it goes
+local SL_WHEEL = 0.1                -- a notch of the wheel: 10 percent
+local function UpdateSlider()
+    local p = S.slider
+    if not p then return end
+    local v = Blend()
+    local y = v * SL_TRACK
+    S.sliderFill:SetHeight(math.max(1, y))
+    S.sliderFill:SetShown(y >= 1)
+    S.sliderThumb:ClearAllPoints()
+    S.sliderThumb:SetPoint("CENTER", S.sliderTrack, "BOTTOM", 0, y)
+    S.sliderValue:SetText(v <= 0 and "off" or ("%d%%"):format(math.floor(v * 100 + 0.5)))
+end
+
 -- The glow while the imagery is on, and the picture again (the other look changed).
 function M:UpdateLayer()
     local g = S.layerGlow
@@ -213,12 +248,14 @@ function M:UpdateLayer()
     local on = ImageryOn()
     if g:IsShown() ~= on then g:SetShown(on) end
     if ns.MinimapLayer then ns.MinimapLayer:RefreshPreview(true) end
+    UpdateSlider() -- (1.8.0)
 end
 
 ---------------------------------------------------------------------------
 -- The hover text (an addon frame: GameTooltip stays untouched, as Dungeon.lua's tooltip)
 ---------------------------------------------------------------------------
-local function ShowTip(owner, text)
+-- (beside: a frame the text goes left of - (1.8.0) the blend slider - instead of over owner)
+local function ShowTip(owner, text, beside)
     if owner.IsMenuOpen and owner:IsMenuOpen() then return end
     local f = S.tip
     if not f then
@@ -243,12 +280,166 @@ local function ShowTip(owner, text)
     if type(w) ~= "number" or w <= 0 then w = 150 end
     f:SetSize(w + 16, 12 + 14)
     f:ClearAllPoints()
-    f:SetPoint("BOTTOMRIGHT", owner, "TOPRIGHT", 0, 2)
+    if beside then
+        f:SetPoint("BOTTOMRIGHT", beside, "BOTTOMLEFT", -2, 0)
+    else
+        f:SetPoint("BOTTOMRIGHT", owner, "TOPRIGHT", 0, 2)
+    end
     f:Show()
 end
 
 local function HideTip()
     if S.tip then S.tip:Hide() end
+end
+
+---------------------------------------------------------------------------
+-- (1.8.0) The blend slider (see the header)
+---------------------------------------------------------------------------
+local function SliderOpen() return S.slider ~= nil and S.slider:IsShown() end
+local function LayerTipShow()
+    if S.layer then ShowTip(S.layer, LayerTip(), SliderOpen() and S.slider or nil) end
+end
+
+-- A share v: below 5 percent - the foot - the imagery off (its share kept); else that share, the imagery on.
+local function SetBlend(v)
+    local O = ns.Options
+    if not (O and ns.db) then return end
+    v = math.max(0, math.min(1, v))
+    if v < 0.05 then
+        if ImageryOn() then O:Set("imagery", false, true) end
+    else
+        local pct = math.floor(v * 100 + 0.5)
+        if O:Get("imageryBlend") ~= pct then O:Set("imageryBlend", pct, true) end
+        if not ImageryOn() then O:Set("imagery", true, true) end
+    end
+    UpdateSlider()
+    if S.tip and S.tip:IsShown() then LayerTipShow() end
+end
+
+-- The share under the cursor on the track (nil: no track yet)
+local function SliderAtCursor()
+    local track = S.sliderTrack
+    local b, t = track:GetBottom(), track:GetTop()
+    if not (b and t) or t <= b then return nil end
+    local _, cy = GetCursorPosition()
+    return (cy / track:GetEffectiveScale() - b) / (t - b)
+end
+
+-- A drag ends: at the foot, the share as before it (the button's click brings the imagery back at it)
+local function SliderRelease()
+    if not S.sliderDrag then return end
+    local from = S.sliderDrag
+    S.sliderDrag = nil
+    if not ImageryOn() and type(from) == "number" and ns.Options:Get("imageryBlend") ~= from then
+        ns.Options:Set("imageryBlend", from, true)
+    end
+    UpdateSlider()
+end
+
+-- Each frame while the cursor is on the button or the slider, or the slider shows: it comes after SL_SHOW on the button,
+-- follows a drag, goes SL_HIDE after the cursor has left both
+local function SliderDrive()
+    local l, p = S.layer, S.slider
+    if not (l and p) then return end
+    local now = GetTime()
+    if S.sliderDrag then
+        local v = SliderAtCursor()
+        if v and math.abs(v - (S.sliderLast or -1)) >= 0.005 then
+            S.sliderLast = v
+            SetBlend(v)
+        end
+    end
+    local over = S.sliderDrag or (l:IsVisible() and l:IsMouseOver()) or (p:IsShown() and p:IsMouseOver())
+    if over then
+        S.sliderOff = nil
+        S.sliderOver = S.sliderOver or now
+        if not p:IsShown() and l:IsVisible() and now - S.sliderOver >= SL_SHOW then
+            p:Show()
+            UpdateSlider()
+            if S.tip and S.tip:IsShown() then LayerTipShow() end
+        end
+    else
+        S.sliderOver = nil
+        S.sliderOff = S.sliderOff or now
+        if p:IsShown() and now - S.sliderOff >= SL_HIDE then p:Hide() end
+        if not p:IsShown() then S.sliderDriver:Hide() end -- (till the cursor is on the button again)
+    end
+end
+
+local function BuildSlider(map, l)
+    local p = CreateFrame("Frame", nil, map)
+    p:SetSize(SL_W, SL_H)
+    p:SetPoint("BOTTOM", l, "TOP", 0, 2)
+    if p.SetFrameStrata then p:SetFrameStrata("HIGH") end
+    if p.SetFixedFrameStrata then p:SetFixedFrameStrata(true) end
+    p:SetFrameLevel(l:GetFrameLevel() + 5)
+    p:EnableMouse(true)
+    p:EnableMouseWheel(true)
+    -- (the hover text's look)
+    local edge = p:CreateTexture(nil, "BACKGROUND", nil, -8)
+    edge:SetAllPoints(p)
+    edge:SetColorTexture(0.62, 0.5, 0.26, 0.9)
+    local bg = p:CreateTexture(nil, "BACKGROUND", nil, -7)
+    bg:SetPoint("TOPLEFT", p, "TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(0.04, 0.035, 0.03, 0.94)
+    local function Text(r, g, b)
+        local fs = p:CreateFontString(nil, "OVERLAY")
+        fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "")
+        fs:SetTextColor(r, g, b)
+        return fs
+    end
+    local top = Text(1, 0.82, 0)
+    top:SetPoint("TOP", p, "TOP", 0, -6)
+    top:SetText("Imagery")
+    local val = Text(1, 1, 1)
+    val:SetPoint("TOP", top, "BOTTOM", 0, -3)
+    local foot = Text(1, 0.82, 0)
+    foot:SetPoint("BOTTOM", p, "BOTTOM", 0, 7)
+    foot:SetText("Drawn")
+    local track = p:CreateTexture(nil, "ARTWORK")
+    track:SetSize(6, SL_TRACK)
+    track:SetPoint("TOP", p, "TOP", 0, -SL_TOP)
+    track:SetColorTexture(0.24, 0.21, 0.17, 1)
+    local fill = p:CreateTexture(nil, "ARTWORK", nil, 1)
+    fill:SetWidth(6)
+    fill:SetPoint("BOTTOM", track, "BOTTOM", 0, 0)
+    fill:SetColorTexture(0.52, 0.74, 0.42, 1) -- (the imagery's share: terrain green)
+    local thumb = p:CreateTexture(nil, "OVERLAY", nil, 1)
+    thumb:SetSize(24, 10)
+    thumb:SetColorTexture(0.09, 0.07, 0.04, 1)
+    local knob = p:CreateTexture(nil, "OVERLAY", nil, 2)
+    knob:SetPoint("TOPLEFT", thumb, "TOPLEFT", 1, -1)
+    knob:SetPoint("BOTTOMRIGHT", thumb, "BOTTOMRIGHT", -1, 1)
+    knob:SetColorTexture(1, 0.82, 0.25, 1)
+    S.slider, S.sliderTrack, S.sliderFill, S.sliderThumb, S.sliderValue = p, track, fill, thumb, val
+
+    p:SetScript("OnMouseDown", function(_, button)
+        if button ~= "LeftButton" then return end
+        S.sliderDrag = tonumber(ns.Options:Get("imageryBlend")) or 100
+        S.sliderLast = nil
+        S.sliderDriver:Show()
+        local v = SliderAtCursor()
+        if v then
+            S.sliderLast = v
+            SetBlend(v)
+        end
+    end)
+    p:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then SliderRelease() end end)
+    p:SetScript("OnMouseWheel", function(_, delta) SetBlend(Blend() + delta * SL_WHEEL) end)
+    p:SetScript("OnHide", SliderRelease)
+    p:Hide()
+
+    local d = CreateFrame("Frame", nil, map)
+    d:SetScript("OnUpdate", SliderDrive)
+    d:Hide()
+    S.sliderDriver = d
+    -- (the map closed: the slider with it - not back by itself at the next opening)
+    map:HookScript("OnHide", function()
+        p:Hide()
+        d:Hide()
+        S.sliderOver, S.sliderOff = nil, nil
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -365,9 +556,20 @@ local function Build()
     g:SetPoint("TOPLEFT", l, "TOPLEFT", -2, 1)
     g:Hide()
     S.layerGlow = g
+    -- (1.8.0) the blend slider above it: the cursor resting on the button brings it, the wheel over the button sets the
+    -- share as over the slider, a click still switches the two looks at once
+    BuildSlider(map, l)
+    l:SetScript("OnEnter", function()
+        LayerTipShow()
+        S.sliderOff = nil
+        S.sliderDriver:Show()
+    end)
+    l:EnableMouseWheel(true)
+    l:SetScript("OnMouseWheel", function(_, delta) SetBlend(Blend() + delta * SL_WHEEL) end)
     l:SetScript("OnClick", function()
         ns.Options:Toggle("imagery", true)
-        ShowTip(l, LayerTip())
+        UpdateSlider()
+        LayerTipShow()
     end)
 
     -- The quest-log arrow comes and goes with the map's display state (QuestLogOwnerMixin:SetDisplayState).
@@ -393,12 +595,15 @@ function M:Apply()
         c:Hide()
         l:Hide()
     end
+    if S.slider and not l:IsShown() then S.slider:Hide() end -- ((1.8.0) the blend slider goes with its button)
     M:UpdateLayer()
 end
 
 function M:Button() return S.button end
 function M:CavesButton() return S.caves end
 function M:LayerButton() return S.layer, S.layerIcon, S.layerGlow end -- (1.3.0)
+-- (1.8.0, tests) the blend slider: its panel, track, thumb, number, and the frame that drives it
+function M:BlendSlider() return S.slider, S.sliderTrack, S.sliderThumb, S.sliderValue, S.sliderDriver end
 function M:UsesBlizzardMenu() return S.dropdown == true end
 
 local ev = CreateFrame("Frame")

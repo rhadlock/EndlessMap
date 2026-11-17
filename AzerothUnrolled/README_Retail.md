@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.7.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
+Version 1.8.0 - for **retail World of Warcraft** (12.1.5, interface 120105).
 
 One smooth zoom over the whole world map. Open the map and you are in space, on Blizzard's map of the worlds; scroll
 into any world, any continent, through the small inset maps (Argus, the Maelstrom, Nazjatar, ...) down to the centre
@@ -33,7 +33,9 @@ loads the new files.
   width and height - the map fills it. It stays where you put it, in combat too; the full map stays full size
   (`/emap window`).
 - Minimap imagery: the map drawn from the game's own minimap pictures - the real terrain, with the fog of war - instead
-  of the drawn map (the round button with the terrain picture, or `/emap imagery`; off by default).
+  of the drawn map (the round button with the terrain picture, or `/emap imagery`; off by default). Blend the two: rest
+  the cursor on that button and a slider comes up above it - the imagery at its top, the drawn map at its foot; drag it
+  or turn the mouse wheel over it. A click on the button still switches at once.
 - Caves and interiors show their tunnels from world zoom 30 (the caves button, or `/emap cavezoom`).
 - Place names: cities, dungeons and raids (with their level range), flight masters. A click on a door's name flies
   there and opens the dungeon's map; while you are inside an instance its door shows your icon.
@@ -70,6 +72,7 @@ slash command.
 | `/emap window` | moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/emap window reset`: the game's place and size again |
 | `/emap bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
 | `/emap imagery` | the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
+| `/emap blend <N>` | how much of the minimap imagery shows over the drawn map, 5 - 100 percent (default 100: the imagery alone) - the imagery button's slider sets it too |
 | `/emap imagerytiles` | the minimap imagery's closest zoom from the game's own minimap tiles: on / off (default on) |
 | `/emap cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: default 30; off = never |
 | `/emap link` | the download link in your own chat window (only you see it) |
