@@ -44,9 +44,21 @@ tiling of them: one mask per tile, as Render's footprints; a union of masks is d
 texture would intersect), each copy cut to the tile's used part (CLAMP), one mask per texture. The six capitals' cells
 (ZoneMasks) are always explored; (1.3.1: the fog of war) Gilneas's explored areas are lit through their pieces' masks
 (Gilneas.lua G:FogTiles - Blizzard has no explored areas there: the add-on's own, one tile per explored area), its
-unexplored land greys as anywhere; the sea always in colour (the sea masks lie above the fog). Below continent zoom 2.5
-the imagery is all in colour, as Blizzard's continent maps have no fog. MAP_EXPLORATION_UPDATED (Render:MarkArtDirty)
-rebuilds the copies: those that stay keep their texture - nothing blinks.
+unexplored land greys as anywhere; the sea always in colour (the sea masks lie above the fog). MAP_EXPLORATION_UPDATED
+(Render:MarkArtDirty) rebuilds the copies: those that stay keep their texture - nothing blinks.
+(1.8.1) The fog at every zoom - a player's request on 1.8.0, through the author: "keep the undiscovered fade when zoomed
+out all the way", then "FOW should always be visable. that was the request." (Up to 1.8.0 it faded in from continent
+zoom 2.5 to 4, all colour below it.) The backdrop (level 1, the world view) takes copies too, while it is the target
+(once a finer target covers the view they go: its pictures stay). The world view holds every explored area of both
+continents - 937 of the game's 256 px tiles -, so the coarse levels (COARSE_LEVEL: the 16 and 32 px ones) take coarse
+masks: a zone whose every explored-area piece is explored (WholeZone: the game's list against OverlayData.lua's every
+piece) through its zone cell (ZoneMasks: one mask over the zone, as the capitals'), each piece of any other through its
+own mask (CoarseTiles: Masks\fog\<its first tile>.tga, tools/minimap/build_fog_masks.py - the piece's opacity from the
+game's own tiles, 32 - 128 px, 554 of them; FogMaskData.lua names the arts that have them). The finer levels keep the
+game's tiles. The imagery suite's I14 (each view from the one before, every zone explored and every zone but one piece,
+on a 1080p and a 4K screen): on the 1080p screen at most 946 masks at rest (the world view, 428 of them the sea's); on
+the 4K screen the world view is the 64 px level - every tile, 1377 masks -, the handover peak 3132 textures and 1883
+masks (the caps: MAX_TEX, MAX_MASKS).
 
 What else changes while the imagery shows (Render.lua, Labels.lua): no parchment base, cell, piece or core; the city
 maps only of the capitals underground (KEEP_CITY: Ironforge, Undercity - the surface imagery shows Stormwind,
@@ -74,15 +86,20 @@ local WIN_SHRINK = 1.6                    -- any window rebuilt once wider or ta
 local CLIENT_WIN, CLIENT_KEEP = 1, 0.25   -- the client tiles' window: a tile round the view; rebuilt at a quarter tile
 local LOAD_FADE, LOAD_TIMEOUT = 0.15, 2   -- a picture fades in over this once loaded (after the timeout anyway)
 local LEVEL_FADE = 0.2                    -- a level fades in / out over this
-local FOG_C0, FOG_C1, FOG_PRE = 2.5, 4, 2 -- continent zoom: the fog fades in (Render LOD_C0 / LOD_C1), built from FOG_PRE
 local FOG_DESAT, FOG_DIM = 0.9, 0.6       -- unexplored land: desaturated this much, darkened to this
-local MAX_TEX, MAX_MASKS = 3000, 1200     -- hard caps: the textures and masks this file ever makes (all explored: 4K, out of
-                                          -- the client tiles, about 2300 textures at the peak; the fog's first zoom 700 masks)
+local COARSE_LEVEL = 2                    -- (1.8.1) this level and the coarser ones: the fog's coarse masks (a zone explored
+                                          -- whole through its cell, else each explored piece through its own mask)
+local MAX_TEX, MAX_MASKS = 4000, 2400     -- hard caps: the textures and masks this file ever makes - (1.8.1, the fog at every
+                                          -- zoom) the imagery suite's peak 3132 / 1883 (I14: a 4K screen, the world view on
+                                          -- the 64 px level - every explored tile of both continents -, after the 16 px
+                                          -- level's piece masks); the masks there are at most the data's 937 tiles, 554
+                                          -- pieces, 428 sea masks and a dozen cells (up to 1.8.0: 3000 / 1200, the fog from
+                                          -- continent zoom 2.5 only)
 local LAYERS = { "BACKGROUND", "BORDER", "ARTWORK", "OVERLAY" } -- level 1..4; base sublevel 0, copies 1
 local SEA_SUB = 7                         -- the sea masks' colour quads: OVERLAY 7, above every level
 L.KEEP_CITY = { [1455] = true, [1458] = true } -- Ironforge, Undercity: underground, their city maps stay
 L.CLIENT_IN, L.CLIENT_OUT, L.CLIENT_MAX, L.MAX_TEX, L.MAX_MASKS = CLIENT_IN, CLIENT_OUT, CLIENT_MAX, MAX_TEX, MAX_MASKS
-L.FOG_DESAT, L.FOG_DIM, L.FOG_C0, L.FOG_C1 = FOG_DESAT, FOG_DIM, FOG_C0, FOG_C1
+L.FOG_DESAT, L.FOG_DIM, L.COARSE_LEVEL = FOG_DESAT, FOG_DIM, COARSE_LEVEL
 
 local D = ns.MINIMAP
 local grids                               -- [m] = { ax, bx, ay, by: world-map px of grid point (col, row); pages, tiles, sea }
@@ -96,6 +113,9 @@ local freeTex, freeMask = {}, {}
 local nTex, nMask, nSkipped = 0, 0, 0
 local pending, fading = {}, {}            -- [texture] = true
 local tilesOf, setOf = {}, {}             -- [zone id] = explored mask tiles / explored pieces ("ox:oy:w:h"), this fogGen
+local wholeOf = {}                        -- (1.8.1) [zone id] = its cell's mask tile when every piece is explored, else false
+local coarseOf, pieceIdx = {}, {}         -- (1.8.1) [zone id] = its explored pieces' own mask tiles, this fogGen; [art] = its
+                                          -- OverlayData.lua rows by "ox:oy:w:h"
 local fogGen = 0
 local fl, fogPre, seaA = {}, {}, {}       -- [m] = fog alpha (0..1), fog built, sea quads' alpha
 local active, onSince = false, nil
@@ -376,23 +396,104 @@ local function CapitalTiles(out, m)
     end
 end
 
+-- (1.8.1) Zone e explored whole - every explored-area piece of its art (OverlayData.lua) among the game's explored ones
+-- (those it shows only under the mouse count: they have no colour of their own) -: its cell's mask tile (ZoneMasks, made
+-- for this art: as the capitals' below), else false. Kept till the exploration changes (Render:MarkArtDirty).
+local function WholeZone(e)
+    local w = wholeOf[e.id]
+    if w ~= nil then return w end
+    w = false
+    local c = ns.ZoneMasks and ns.ZoneMasks[e.id]
+    local art = C_Map.GetMapArtID and C_Map.GetMapArtID(e.id)
+    local all = art and ns.OVERLAYS and ns.OVERLAYS[art]
+    if c and c.kind == "zone" and art == c.art and c.nz and all and #all > 0 and e.lw and e.lh
+        and C_MapExplorationInfo and C_MapExplorationInfo.GetExploredMapTextures then
+        local ok, res = pcall(C_MapExplorationInfo.GetExploredMapTextures, e.id)
+        if ok and type(res) == "table" then
+            local have = {}
+            for _, info in ipairs(res) do
+                if type(info) == "table" and info.textureWidth and info.textureHeight then
+                    have[("%d:%d:%d:%d"):format(info.offsetX or 0, info.offsetY or 0, info.textureWidth, info.textureHeight)] = true
+                end
+            end
+            local whole = true
+            for _, p in ipairs(all) do
+                if not have[("%d:%d:%d:%d"):format(p[1], p[2], p[3], p[4])] then
+                    whole = false
+                    break
+                end
+            end
+            if whole then
+                local kx, ky = (e.x1 - e.x0) * W0 / e.lw, (e.y1 - e.y0) * H0 / e.lh
+                local nz = c.nz
+                w = { key = "cell:" .. e.id, file = c.file, mx = e.x0 * W0, my = e.y0 * H0,
+                    mw = (e.x1 - e.x0) * W0, mh = (e.y1 - e.y0) * H0,
+                    ux0 = e.x0 * W0 + nz[1] * kx, uy0 = e.y0 * H0 + nz[2] * ky,
+                    ux1 = e.x0 * W0 + nz[3] * kx, uy1 = e.y0 * H0 + nz[4] * ky }
+            end
+        end
+    end
+    wholeOf[e.id] = w
+    return w
+end
+
+-- (1.8.1) Zone e's explored pieces (list: ExploredList) on the coarse levels, each through its own mask: Masks\fog\<its
+-- first tile's fileDataID>.tga (tools/minimap/build_fog_masks.py: the piece's opacity from the game's own overlay tiles,
+-- at most 1.5 of the 32 px level's texels a mask px), stretched over the piece's rect - for an art every piece of which
+-- has one (FogMaskData.lua). A piece the art's OverlayData.lua rows lack (the client's data newer than ours) goes
+-- through the game's own tiles, as on the finer levels.
+local function PieceRow(art, info)
+    local idx = pieceIdx[art]
+    if not idx then
+        idx = {}
+        for _, r in ipairs(ns.OVERLAYS[art]) do idx[("%d:%d:%d:%d"):format(r[1], r[2], r[3], r[4])] = r end
+        pieceIdx[art] = idx
+    end
+    return idx[("%d:%d:%d:%d"):format(info.offsetX or 0, info.offsetY or 0, info.textureWidth, info.textureHeight)]
+end
+local function CoarseTiles(e, list, out)
+    local art = C_Map.GetMapArtID and C_Map.GetMapArtID(e.id)
+    local own = art and ns.FOG_MASK_ARTS and ns.FOG_MASK_ARTS[art] and ns.OVERLAYS and ns.OVERLAYS[art] ~= nil
+    local kx, ky = (e.x1 - e.x0) * W0 / e.lw, (e.y1 - e.y0) * H0 / e.lh
+    local ox, oy = e.x0 * W0, e.y0 * H0
+    local rest = {}
+    for _, info in ipairs(list) do
+        local r = own and PieceRow(art, info)
+        if r then
+            local x0, y0 = ox + r[1] * kx, oy + r[2] * ky
+            out[#out + 1] = { key = "p:" .. r[5], file = D.maskPath .. "fog\\" .. r[5] .. ".tga", mx = x0, my = y0, mw = r[3] * kx, mh = r[4] * ky,
+                ux0 = x0, uy0 = y0, ux1 = ox + math.min(r[1] + r[3], e.lw) * kx, uy1 = oy + math.min(r[2] + r[4], e.lh) * ky }
+        else
+            rest[#rest + 1] = info
+        end
+    end
+    if #rest > 0 then PieceTiles(e, rest, out) end
+end
+
 -- The mask tiles over world-map px rect R of grid m's continent: every explored-area tile of its zones there, the
--- capitals' cells.
-local function MaskTiles(m, x0, y0, x1, y1)
+-- capitals' cells. (1.8.1) coarse (the 16 and 32 px levels): a zone explored whole by its cell, else each explored piece
+-- by its own mask (CoarseTiles).
+local function MaskTiles(m, x0, y0, x1, y1, coarse)
     local out = {}
     local g = grids[m]
     for _, e in ipairs(ns.drawList or {}) do
         if e.mapType == ns.MAPTYPE_ZONE and e.parent == g.cont and not L.KEEP_CITY[e.id] and e.lw and e.lh
             and e.x0 * W0 < x1 and e.x1 * W0 > x0 and e.y0 * H0 < y1 and e.y1 * H0 > y0 then
-            local T = tilesOf[e.id]
-            if not T then
-                T = {}
-                local list = ExploredList(e.id)
-                if list then PieceTiles(e, list, T) end
-                tilesOf[e.id] = T
-            end
-            for _, t in ipairs(T) do
-                if t.ux0 < x1 and t.ux1 > x0 and t.uy0 < y1 and t.uy1 > y0 then out[#out + 1] = t end
+            local whole = coarse and WholeZone(e)
+            if whole then
+                if whole.ux0 < x1 and whole.ux1 > x0 and whole.uy0 < y1 and whole.uy1 > y0 then out[#out + 1] = whole end
+            else
+                local cache = coarse and coarseOf or tilesOf
+                local T = cache[e.id]
+                if not T then
+                    T = {}
+                    local list = ExploredList(e.id)
+                    if list then (coarse and CoarseTiles or PieceTiles)(e, list, T) end
+                    cache[e.id] = T
+                end
+                for _, t in ipairs(T) do
+                    if t.ux0 < x1 and t.ux1 > x0 and t.uy0 < y1 and t.uy1 > y0 then out[#out + 1] = t end
+                end
             end
         end
     end
@@ -418,11 +519,16 @@ end
 ---------------------------------------------------------------------------
 -- Levels: windows, copies, the sea quads
 ---------------------------------------------------------------------------
-local function ReleaseLevel(lev)
+local function ReleaseCopies(lev)
     for ck, c in pairs(lev.copies) do
         FreeTex(c)
         lev.copies[ck] = nil
     end
+    lev.copyStamp = nil
+end
+
+local function ReleaseLevel(lev)
+    ReleaseCopies(lev)
     for key, t in pairs(lev.tex) do
         FreeTex(t)
         lev.tex[key] = nil
@@ -484,7 +590,7 @@ local function BuildCopies(lev)
     local w = fogWin
     for m, g in pairs(grids) do
         if fogPre[m] and w then
-            for _, T in ipairs(MaskTiles(m, w[1], w[2], w[3], w[4])) do
+            for _, T in ipairs(MaskTiles(m, w[1], w[2], w[3], w[4], lev.i <= COARSE_LEVEL)) do
                 local c0, r0, c1, r1 = CellsOver(g, lev, T.ux0, T.uy0, T.ux1, T.uy1)
                 if c0 then
                     for r = r0, r1 do
@@ -953,22 +1059,12 @@ local function Place(cam, v, ppx, ppy, host)
     view.x1, view.y1 = (cam.x + v.W / 2 / ppx) * W0, (cam.y + v.H / 2 / ppy) * H0
 end
 
--- Fog per continent: its alpha now, whether it is built (from FOG_PRE, or where a zoom in is heading there).
-local function FogState(cam, v, pfvw, pfx0, pfy0, pfx1, pfy1)
-    local flying = ns.Core and ns.Core.State and ns.Core.State() == "fly" -- (1.3.0)
+-- Fog per continent: its alpha now, whether it is built. (1.8.1) Whole and built at every zoom - see the header (up to
+-- 1.8.0 it faded in from continent zoom 2.5 to 4, built from 2, none while a flight had not reached it).
+local function FogState()
     for m, g in pairs(grids) do
-        local cont = ns.maps[g.cont]
-        local f, pre = 0, false
-        if cont then
-            local zc = ns.ZoomOf(v, cont, cam.vw)
-            f = ns.Smooth((zc - FOG_C0) / (FOG_C1 - FOG_C0))
-            pre = zc >= FOG_PRE
-            if not pre and pfvw and cont.x0 < pfx1 and pfx0 < cont.x1 and cont.y0 < pfy1 and pfy0 < cont.y1 then
-                pre = ns.ZoomOf(v, cont, pfvw) >= FOG_PRE
-            end
-        end
-        if flying and f <= 0 then pre = false end -- (1.3.0: a flight builds no fog it does not show yet)
-        fl[m], fogPre[m] = f, pre
+        local on = ns.maps[g.cont] ~= nil
+        fl[m], fogPre[m] = on and 1 or 0, on
     end
 end
 
@@ -998,7 +1094,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
         local d = Pick(g.bx * (v.fit0 / pfvw) * phys, target, pfx0 * W0, pfy0 * H0, pfx1 * W0, pfy1 * H0)
         if d ~= target then dest = d end
     end
-    FogState(cam, v, pfvw, pfx0, pfy0, pfx1, pfy1)
+    FogState()
     local clientA = levels[4].live and levels[4].a or 0
     for m in pairs(grids) do seaA[m] = math.max(fl[m] or 0, clientA) end
     EnsureWindow(levels[1], view.x0, view.y0, view.x1, view.y1)
@@ -1007,11 +1103,11 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
     if dest then EnsureWindow(levels[dest], pfx0 * W0, pfy0 * H0, pfx1 * W0, pfy1 * H0) end
     -- (the target's copies and the sea first: what the caps hold back goes to the levels it replaces)
     copyBudget, copiesShort = COPY_BUDGET, false
-    if target > 1 then BuildCopies(levels[target]) end
+    BuildCopies(levels[target]) -- ((1.8.1) the backdrop's too, the world view's level: the fog at every zoom)
     BuildSea()
-    for i = 2, 4 do
+    for i = 1, 4 do
         local lev = levels[i]
-        if lev.live and i ~= target and (i == dest or lev.a > 0) then BuildCopies(lev) end
+        if lev.live and i ~= target and (i == dest or (i > 1 and lev.a > 0)) then BuildCopies(lev) end
     end
     -- levels: the target fades in; a finer one the zoom left fades out once the target covers the view, a coarser one
     -- goes then; the one a zoom heads for waits hidden
@@ -1035,6 +1131,13 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
             end
         end
     end
+    -- (1.8.1) the backdrop's copies (made while it is the target, the world view's level) go as a coarser level does once a
+    -- finer target covers the view - its pictures stay, the backdrop: no colour of its own under the finer level, whose
+    -- masks the caps keep for it
+    if target ~= 1 and dest ~= 1 and covered and next(levels[1].copies) then
+        ReleaseCopies(levels[1])
+        busy = true
+    end
     if not active and (whole or now - onSince >= LOAD_TIMEOUT) then
         active = true
         holder:SetAlpha(1)
@@ -1057,6 +1160,8 @@ hooksecurefunc(ns.Render, "MarkArtDirty", function()
     fogGen = fogGen + 1
     wipe(tilesOf)
     wipe(setOf)
+    wipe(wholeOf)
+    wipe(coarseOf)
 end)
 hooksecurefunc(ns.Render, "HideAll", function() L:Hide() end)
 hooksecurefunc(ns.Render, "ReleaseAll", function()

@@ -1,5 +1,11 @@
 # Changelog
 
+## Endless Map 1.8.1 - retail
+
+- **No "attempted to call a protected function (Button:SetPassThroughButtons())" error in combat**. With the map closed, the game still remakes the quest markers of the last map shown whenever the quest you track changes, and in a fight it refused one of their calls - naming Endless Map, which had moved the map. Endless Map now leaves the closed map on the world map, which has no quest markers to make; the map still opens on your zone.
+- **The quest log's backgrounds fill a taller map window**. In a map window taller than the game's, the parchment behind a quest's page and the background behind the quest list stopped partway, leaving a bare grey band. They now reach the bottom of the window.
+- **What hangs off the map window's sides stays on screen**. Moved or widened to the screen's right edge, the map window pushed the quest log's own tabs (Quests, Events, Map Legend) and other add-ons' panels docked beside it off the screen. The window now stops where they still fit, and when such a panel opens next to a window at the edge, the window makes room for it, then goes back to your place and size once the panel closes.
+
 ## Endless Map 1.8.0 - retail
 
 - **Travel points by how far they go**. In space, the portals to other worlds; from Azeroth's own map, the ways between its continents too; closer in, the ways within a continent, as before. Hover one for where it goes, click it to fly there.

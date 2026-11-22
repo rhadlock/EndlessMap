@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.8.0 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.8.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands

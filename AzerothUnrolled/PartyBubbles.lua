@@ -7,7 +7,9 @@ zone where they are to the right hand side of the bubble"; then: "in raid only y
 
   * A column of round 28 px bubbles in the map's top left corner, directly under Blizzard's map-pin button
     (WorldMapTrackingPinButton: 32 px at TOPLEFT 3, 0 of the canvas container, Camelot/Blizzard_WorldMap.lua:7-10) and
-    centred under it: you first, then your party - in a raid only your own group (GetRaidRosterInfo's subgroup, by
+    centred under it - (1.8.1) under every button stacked down that corner: other add-ons' map buttons
+    (Krowi_WorldMapButtons, Questie's among them, 32 px a button down from the pin button; the author on 1.8.0: "we
+    should also move our bubbles down a little, we overlap with questie") -: you first, then your party - in a raid only your own group (GetRaidRosterInfo's subgroup, by
     raid index; the raid tokens, not the party ones) - at most five, no gaps. Each is the pin button's art at 7/8
     size, as MapMenu.lua's Dress copies it (Blizzard_WorldMapTemplates.xml:6-59): the minimap's round background, the
     portrait cut round (SetPortraitTexture, UnitDocumentation.lua:571), the gold ring and the blue hover glow; the
@@ -472,6 +474,35 @@ local function BuildTip()
     tip:Hide()
 end
 
+-- (1.8.1) The column's top: under the buttons stacked down the map's top left corner - Krowi_WorldMapButtons on WoW
+-- Forever (lib.AnchorPoint TOPLEFT; elsewhere it stacks them at the top right) lays out its shown buttons, the pin button
+-- first, from lib.YOffset 32 px apart (lib.SetPoints); the same 4 px under the last one as under the pin button alone.
+local KROWI = "Krowi_WorldMapButtons-1.4"
+local placedY, krowiHooked
+local function ColumnTop()
+    local lib = LibStub and LibStub.GetLibrary and LibStub:GetLibrary(KROWI, true)
+    if not (lib and lib.AnchorPoint == "TOPLEFT" and type(lib.Buttons) == "table") then return Y0 end
+    local n = 0
+    for _, button in ipairs(lib.Buttons) do
+        if type(button) == "table" and button.IsShown and button:IsShown() then n = n + 1 end
+    end
+    return math.min(Y0, (tonumber(lib.YOffset) or 0) - 32 * n + (Y0 + 32)) -- (Y0 + 32: the gap under a button, -4)
+end
+local function Place()
+    if not holder then return end
+    local lib = not krowiHooked and LibStub and LibStub.GetLibrary and LibStub:GetLibrary(KROWI, true)
+    if lib and type(lib.SetPoints) == "function" then
+        hooksecurefunc(lib, "SetPoints", Place)
+        krowiHooked = true
+    end
+    local y = ColumnTop()
+    if y ~= placedY then
+        holder:ClearAllPoints()
+        holder:SetPoint("TOPLEFT", WorldMapFrame.ScrollContainer, "TOPLEFT", X0, y)
+        placedY = y
+    end
+end
+
 local function Build()
     local map = WorldMapFrame
     local c = map and map.ScrollContainer
@@ -481,14 +512,15 @@ local function Build()
     if holder.SetFrameStrata then holder:SetFrameStrata("HIGH") end
     if holder.SetFixedFrameStrata then holder:SetFixedFrameStrata(true) end
     ns.SetLevelFixed(holder, LEVEL)
-    holder:SetPoint("TOPLEFT", c, "TOPLEFT", X0, Y0)
     holder:SetSize(SIZE, SIZE + STEP * (MAX - 1))
     holder:EnableMouse(false)
+    Place()
     for i = 1, MAX do bubbles[i] = NewBubble(i) end
     BuildTip()
     -- (UNIT_HEALTH - a death, a resurrection - only while the column shows: in a group it fires all the time)
     holder:SetScript("OnShow", function()
         if ev then pcall(ev.RegisterEvent, ev, "UNIT_HEALTH") end
+        Place() -- ((1.8.1) another add-on's map buttons, made after ours or shown / hidden since)
         B:Refresh()
     end)
     holder:SetScript("OnHide", function()

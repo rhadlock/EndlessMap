@@ -1,5 +1,13 @@
 # Changelog
 
+## Endless Map 1.8.1
+
+- **No "attempted to call a protected function (Button:SetPassThroughButtons())" error in combat** (1.8.1-beta1). With the map closed, the game still remakes the quest markers of the last map shown whenever the quest you track changes, and in a fight it refused one of their calls - naming Endless Map, which had moved the map. Endless Map now leaves the closed map on the world map, which has no quest markers to make; the map still opens on your zone.
+- **The quest log's backgrounds fill a taller map window** (1.8.1-beta2). In a map window taller than the game's, the parchment behind a quest's page and the background behind the quest list stopped partway, leaving a bare grey band. They now reach the bottom of the window.
+- **The party bubbles make room for Questie's map button** (1.8.1-beta2). The bubbles in the map's top left corner covered Questie's button, and any other add-on's button stacked there under the map-pin button; they now start below the last of those buttons.
+- **What hangs off the map window's sides stays on screen** (1.8.1-beta4). Moved or widened to the screen's right edge, the map window pushed the quest log's own tabs (Quests, Events, Map Legend) and other add-ons' panels docked beside it, such as Spoken's Place Story panel, off the screen. The window now stops where they still fit, and when such a panel opens next to a window at the edge, the window makes room for it, then goes back to your place and size once the panel closes.
+- **The fog of war at every zoom** (1.8.1-beta3). With the minimap imagery on, the land you have not discovered was grey only from about a zone's view in; zoomed out to a continent or the whole world, all of it was in colour. Now it stays grey at every zoom, out to the world view, and what you have explored keeps its colour.
+
 ## Endless Map 1.8.0
 
 - **Travel points at every zoom** (1.8.0-beta1). The boats, zeppelins, portals and the tram stay on the map at every zoom, the whole world too: hover one for where it goes, click it to fly there. Zoomed far out the tram shows its icon alone.

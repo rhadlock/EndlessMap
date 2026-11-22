@@ -38,6 +38,23 @@ never calls it - and noted for Core.lua's /reload line (Core.Touch: a switch to 
          same). The page and its text take the window's height over the game's, whoever sized the window - Gamepad UI
          too (two frames' heights, no map code); the full map hides the quest log: the game's heights then. Blizzard's
          rewards box at the page's foot works from the text's scroll range, so it fits itself.
+         (1.8.1; a player on 1.8.0, screenshots of a tall window: "Is it possible stretch the quest panel background texture
+         like the Place Story panel background texture is stretched?") Their backgrounds too: the game sizes them for its own
+         window and stops short of a taller one - the page's parchment (DetailsFrame.Bg, a quest's SealMaterialBG) at most
+         440 tall (QuestLogQuestDetailsMixin:AdjustBackgroundTexture), the list's (QuestScrollFrame.Background) at its
+         picture's height (QuestLogScrollFrameMixin:ResizeBackground), a bare band under each. The page's: the game's sizing
+         with its cap the window's height over the game's higher - cut where the picture is long enough, stretched where it
+         runs out; the list's: stretched over the list where it is taller than its picture. After the game's own sizing
+         (post-hooks of those two) and at each size of the window. Textures only (WoW Forever 71037 and retail 70783 the same).
+  dock   (1.8.1; the author on a player's add-ons: "update what we can") what hangs outside the window's sides stays on the
+         screen with it: the quest log's own tabs (QuestMapFrame.xml QuestsTab, EventsTab, MapLegendTab - TOPLEFT at the
+         log's TOPRIGHT, 5 px out on WoW Forever: QuestMapFrameOverrides.GetQuestsTabAnchorOffset) and other add-ons'
+         panels docked there - Spoken's Place Story panel (SpokenPlacesPanel, its Places part: 360 wide at the window's
+         right, TOPLEFT and BOTTOMLEFT at the map border's right corners, never clamped to the screen) and the tab that
+         reopens it. The children of the map, its border and its quest log whose middle lies outside the window and that
+         reach no further in than DOCK_SLACK: their reach past each side narrows the window's place and size limits (the
+         grip's drag, a move, a saved size and place - what is saved stays the player's: the window takes it back when they
+         go). A child of those three shown or hidden asks again the frame after (DockSoon; as Spoken lays out its own tabs).
   full   the full map (maximized) stays the game's: its own place and size; back to the window, the player's again
   off    the setting mapWindow (default on; /unroll window): no handles, the game's last place and its own size
   reset  the map menu, /unroll window reset, /unroll reset: the game's last place and size
@@ -102,17 +119,57 @@ local function Cursor()
     return x / es, y / es
 end
 
--- A size (the map's width, the window's height) kept between the smallest and the screen.
+-- (1.8.1) What hangs outside the window's sides (see the header, dock): how far past its left and its right edge, in
+-- UIParent's units - read by Docked() at each placing of the add-on's and at a drag's start.
+local DOCK_SLACK = 12 -- (how far inside the window a docked frame's edge may lie: a tab tucked under the border)
+local dockL, dockR = 0, 0
+local dockHooked = setmetatable({}, { __mode = "k" })
+local DockSoon
+local function Docked()
+    local f = WorldMapFrame
+    local ui = UIParent:GetEffectiveScale()
+    local fl, fr = f:GetLeft(), f:GetRight()
+    if not (fl and fr and ui and ui > 0) then return 0, 0 end
+    local k = f:GetEffectiveScale() / ui
+    fl, fr = fl * k, fr * k
+    local l, r = 0, 0
+    for _, parent in ipairs({ f, f.BorderFrame or false, f.QuestLog or false }) do
+        if parent then
+            for _, c in ipairs({ parent:GetChildren() }) do
+                if not dockHooked[c] and c.HookScript then -- (each child once, as first seen: it may dock later)
+                    dockHooked[c] = true
+                    c:HookScript("OnShow", DockSoon)
+                    c:HookScript("OnHide", DockSoon)
+                end
+                if c:IsVisible() then
+                    local cl, cr = c:GetLeft(), c:GetRight()
+                    if cl and cr then
+                        local kc = c:GetEffectiveScale() / ui
+                        cl, cr = cl * kc, cr * kc
+                        local mid = (cl + cr) / 2
+                        if mid > fr and cl >= fr - DOCK_SLACK then r = math.max(r, cr - fr) end
+                        if mid < fl and cr <= fl + DOCK_SLACK then l = math.max(l, fl - cl) end
+                    end
+                end
+            end
+        end
+    end
+    return l, r
+end
+
+-- A size (the map's width, the window's height) kept between the smallest and the screen ((1.8.1) with what is docked).
 local function ClampSize(w, h)
     local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
-    w = math.max(MIN_W, math.min(sw - LogWidth(), w))
+    w = math.max(MIN_W, math.min(sw - LogWidth() - dockL - dockR, w))
     h = math.max(MIN_H, math.min(sh, h))
     return w, h
 end
--- The window's top left (x, y) kept on the screen at size (fw, fh): all of it where it fits, else its top left edge.
+-- The window's top left (x, y) kept on the screen at size (fw, fh), (1.8.1) what is docked at its sides with it: all of it
+-- where it fits, else its top left edge.
 local function ClampPos(x, y, fw, fh)
     local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
-    x = math.max(math.min(0, sw - fw), math.min(math.max(0, sw - fw), x))
+    local lo, hi = dockL, sw - fw - dockR
+    x = math.max(math.min(lo, hi), math.min(math.max(lo, hi), x))
     y = math.max(math.min(sh, fh), math.min(math.max(sh, fh), y))
     return x, y
 end
@@ -128,6 +185,49 @@ end
 -- (1.7.1) The quest page beside the map follows the window's height - see the header. Its heights for the game's window
 -- are the ones it has before any change of the add-on's (only the add-on changes them).
 local pageBase -- { page, text }: the quest page's and its text's heights for the game's window
+-- (the window's height over the game's - the full map hides the quest log, QuestLogOwnerMixin:SetDisplayState: none then)
+local function Extra()
+    local f = WorldMapFrame
+    if not f.minimizedHeight or f:IsMaximized() then return 0 end
+    return f:GetHeight() - f.minimizedHeight
+end
+
+-- (1.8.1) The quest log's backgrounds over a taller window - see the header. The page's (DetailsFrame.Bg; a quest's
+-- SealMaterialBG): QuestLogQuestDetailsMixin:AdjustBackgroundTexture's own sizing - the picture as wide as the page, at most
+-- PAGE_BG_MAX tall, cut there - with that cap the window's height over the game's higher: cut where the picture is long
+-- enough, stretched where it runs out. For the game's window the game's own result.
+local PAGE_BG_MAX = 440 -- ("Capping off at 440 max height so it doesn't run out of bounds")
+local function AtlasSize(texture)
+    local atlas = texture and texture:GetAtlas()
+    local info = atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
+    if info and type(info.width) == "number" and info.width > 0 and type(info.height) == "number" and info.height > 0 then
+        return info.width, info.height
+    end
+end
+local function FitPageBg(page, texture)
+    local aw, ah = AtlasSize(texture)
+    if not aw then return end
+    local width = page:GetWidth()
+    local needed = ah * width / aw
+    local h = math.min(needed, PAGE_BG_MAX) + Extra()
+    if h <= 0 then return end
+    texture:SetWidth(width)
+    texture:SetTexCoord(0, 1, 0, needed > h and h / needed or 1)
+    texture:SetHeight(h)
+end
+-- The list's (QuestScrollFrame.Background): QuestLogScrollFrameMixin:ResizeBackground cuts the picture at the list's height
+-- and keeps its own height where the list is taller; stretched over the list there. (The game reads the picture's height
+-- back from the texture, a height it set itself: the atlas's here.)
+local function FitListBg(list)
+    local bg = list and list.Background
+    local _, ah = AtlasSize(bg)
+    if not ah then return end
+    local h = list:GetHeight()
+    if not h or h <= 0 then return end
+    bg:SetHeight(h)
+    bg:SetTexCoord(0, 1, 0, h < ah and h / ah or 1)
+end
+
 local function FitPage()
     local f = WorldMapFrame
     local log = f.QuestLog
@@ -135,10 +235,12 @@ local function FitPage()
     local text = page and page.ScrollFrame
     if not (text and f.minimizedHeight) then return end
     if not pageBase then pageBase = { page = page:GetHeight(), text = text:GetHeight() } end
-    -- (the full map hides the quest log - QuestLogOwnerMixin:SetDisplayState: its page as the game's then)
-    local extra = f:IsMaximized() and 0 or f:GetHeight() - f.minimizedHeight
+    local extra = Extra()
     if math.abs(page:GetHeight() - (pageBase.page + extra)) > 0.01 then page:SetHeight(pageBase.page + extra) end
     if math.abs(text:GetHeight() - (pageBase.text + extra)) > 0.01 then text:SetHeight(pageBase.text + extra) end
+    FitPageBg(page, page.Bg)
+    FitPageBg(page, page.SealMaterialBG)
+    FitListBg(log.QuestsFrame and log.QuestsFrame.ScrollFrame)
 end
 
 local function Place(x, y, w, h)
@@ -214,6 +316,7 @@ function W:Apply()
     local on = Allowed()
     local saved = Saved()
     if on and Windowed() and saved and (saved.x or saved.w) then
+        dockL, dockR = Docked()
         local gw, gh = GameSize()
         local w, h = ClampSize(saved.w or (gw - LogWidth()), saved.h or gh)
         if saved.x then
@@ -230,11 +333,28 @@ function W:Apply()
     grip:SetShown(show)
 end
 
--- (after the game placed or sized the window: post-hooks, the map's OnShow)
+-- (after the game placed or sized the window: post-hooks, the map's OnShow - (1.8.1) and the frame after, what docked at
+-- its sides in the same showing: another add-on's panel shown by its own hook of it)
 local function After()
     if not built or drag or not WorldMapFrame:IsShown() then return end
     Remember()
     W:Apply()
+    DockSoon()
+end
+
+-- (1.8.1) A child of the map, its border or its quest log shown or hidden (Docked hooks each): what hangs outside the
+-- window read again the frame after - when every hook of that showing has run -, the window placed again if it changed.
+local dockPending = false
+local function DockCheck()
+    dockPending = false
+    if not built or drag or not ours or not Allowed() or not Windowed() then return end
+    local l, r = Docked()
+    if math.abs(l - dockL) > 0.5 or math.abs(r - dockR) > 0.5 then W:Apply() end
+end
+DockSoon = function()
+    if dockPending then return end
+    dockPending = true
+    C_Timer.After(0, DockCheck)
 end
 
 -- A press on the handle (move) or the grip (size); the window follows the cursor until the release.
@@ -242,8 +362,9 @@ local function Track()
     local d = drag
     if not d then return end
     local cx, cy = Cursor()
-    if d.size then -- (the top left stays: the window up to the screen's right and bottom edges from it)
-        local w, h = ClampSize(math.min(d.w + cx - d.cx, UIParent:GetWidth() - d.x - LogWidth()), math.min(d.h + d.cy - cy, d.y))
+    if d.size then -- (the top left stays: the window up to the screen's right and bottom edges from it - (1.8.1) what is
+        -- docked at its right with it)
+        local w, h = ClampSize(math.min(d.w + cx - d.cx, UIParent:GetWidth() - d.x - LogWidth() - dockR), math.min(d.h + d.cy - cy, d.y))
         Place(d.x, d.y, w, h)
     else
         Place(d.x + cx - d.cx, d.y + cy - d.cy, d.w, d.h)
@@ -254,6 +375,7 @@ local function Begin(size)
     local f = WorldMapFrame
     if InCombatLockdown() and f:IsProtected() then return end
     Remember()
+    dockL, dockR = Docked()
     local cx, cy = Cursor()
     local s = f:GetScale()
     drag = { size = size, cx = cx, cy = cy, x = f:GetLeft() * s, y = f:GetTop() * s,
@@ -312,6 +434,15 @@ local function Build()
     hooksecurefunc("UpdateUIPanelPositions", After)
     f:HookScript("OnShow", After)
     if f.SynchronizeDisplayState then hooksecurefunc(f, "SynchronizeDisplayState", After) end
+    -- ((1.8.1) the quest log's backgrounds after the game's own sizing of them: the page's at its showing and each quest's,
+    -- the list's at each size of the list)
+    local log = f.QuestLog
+    local page = log and log.DetailsFrame
+    if page and page.AdjustBackgroundTexture then
+        hooksecurefunc(page, "AdjustBackgroundTexture", function(self, texture) FitPageBg(self, texture) end)
+    end
+    local list = log and log.QuestsFrame and log.QuestsFrame.ScrollFrame
+    if list and list.ResizeBackground then hooksecurefunc(list, "ResizeBackground", FitListBg) end
     built = true
     if f:IsShown() then After() end
 end

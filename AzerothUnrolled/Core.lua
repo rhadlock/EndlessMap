@@ -523,6 +523,34 @@ local function SwitchMap(id)
     perf.Map()
 end
 
+-- (1.8.1) The closed map parked on the world map. Endless Map's writes into Blizzard's map - a map switch (SwitchMap), a
+-- view (SetRealView) - stay Endless Map's for the session: the client's taint, which only a /reload clears
+-- (MapCanvasMixin:SetMapID reads self.mapID before it writes it). Blizzard's quest markers are made for that map, closed
+-- too: QuestDataProviderMixin:RegisterEvents leaves its "Supertracking.OnChanged" callback on when the map hides, so every
+-- change of the quest tracked makes the closed map's markers again (RefreshAllData), and each passes the right button
+-- through (MapCanvasMixin:AcquirePin -> CheckMouseButtonPassthrough -> SetPassThroughButtons) - a call the game refuses to
+-- anything tainted in combat. A player's report on 1.8.0 (WoW Forever 71037): "AddOn AzerothUnrolled attempted to call a
+-- protected function (Button:SetPassThroughButtons()) during combat lockdown", 12 times, from that callback. The world
+-- map shows no quest (MapUtil.ShouldMapTypeShowQuests): parked there, the closed map has no marker to make. The game opens
+-- the map on your zone as ever (WorldMapMixin:OnShow). Never in combat - a switch then makes markers itself -: a map
+-- closed in a fight is parked when it ends. Only after a write of ours (touched): an untouched map is the game's own.
+-- later: closed in combat, to park at PLAYER_REGEN_ENABLED.
+local park = { later = false }
+function park.Now()
+    park.later = false
+    if not (ready and touched and On()) or WorldMapFrame:IsShown() then return end
+    if InCombatLockdown() then
+        park.later = true
+        return
+    end
+    local id = ns.WORLD_MAP_ID
+    if not ns.maps[id] or WorldMapFrame:GetMapID() == id then return end
+    syncing = true
+    local ok, err = pcall(SwitchMap, id)
+    syncing = false
+    if not ok then geterrorhandler()(err) end
+end
+
 local function SyncReal(M)
     syncing = true
     local ok, err = pcall(function()
@@ -2498,6 +2526,10 @@ local function Setup()
     if WorldMapFrame:IsShown() then ResyncFromReal() end
     if ns.Dungeon then ns.Dungeon:Setup() end
     if ns.Follow then ns.Follow:Setup() end -- (1.1.0: the M key)
+    -- (1.8.1) the closed map parked on the world map: its own hook, after the dungeon view's (Dungeon:Setup above) - the
+    -- park once the view has given the map back (1.8.1-beta1 parked in the hook above, while the view still owned the map:
+    -- its own OnMapChanged took that for the player's map change; the fuzz: dungeons.setmap)
+    WorldMapFrame:HookScript("OnHide", park.Now)
 end
 
 ---------------------------------------------------------------------------
@@ -2764,5 +2796,6 @@ events:SetScript("OnEvent", function(_, event, arg1)
         if ready and state == "hold" and WorldMapFrame:IsShown() then
             BeginSettle()
         end
+        if park.later then park.Now() end -- (1.8.1: a map closed in the fight)
     end
 end)
