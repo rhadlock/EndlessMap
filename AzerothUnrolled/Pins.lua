@@ -1139,6 +1139,36 @@ watch:SetScript("OnUpdate", function(_, elapsed)
     Hover()
     ReadAtRest()
 end)
+-- (1.8.2) The map pin's share. A player's report on 1.8.1: "AddOn AzerothUnrolled attempted to call a forbidden function
+-- (CopyToClipboard()) from a tainted execution path" - WaypointLocationPinMixin:OnMouseClickAction (WoW Forever and retail
+-- alike): a click with the chat-link modifier inserts the pin's link in chat, then CopySlashCommandToClipboard copies
+-- "/mappin ..." with CopyToClipboard, which the game refuses from a tainted path. Once Endless Map has switched Blizzard's
+-- map, the map's ID stays tainted for the session (MapCanvasMixin:SetMapID reads it before it writes it), and every
+-- refresh of the pin (WaypointLocationDataProviderMixin:RefreshAllData reads it) makes the pin under that taint
+-- (AcquirePin: its owningMap) - so its share click reads it and the copy is refused, naming the add-on. The whole cure is a
+-- view that never writes Blizzard's map (the controller mode's plan). Until then a click handler of the map's
+-- (AddGlobalPinMouseActionHandler: Blizzard calls it through securecallfunction - our code runs in none of its own)
+-- takes that one click while the pin is so made: the link into chat and the share sound, as Blizzard's own; the clipboard
+-- copy left out (no add-on may copy). A pin made clean: Blizzard's own click, the copy too.
+local WAYPOINT = "WaypointLocationPinTemplate"
+local function ShareClick(_, mouseAction, button)
+    if button ~= "LeftButton" or mouseAction ~= MapCanvasMixin.MouseAction.Click or not IsModifiedClick("CHATLINK") then return false end
+    local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
+    local pin
+    for _, f in ipairs(foci) do
+        if type(f) == "table" and f.pinTemplate == WAYPOINT then
+            pin = f
+            break
+        end
+    end
+    if not pin or issecurevariable(pin, "owningMap") then return false end
+    if ChatFrameUtil and ChatFrameUtil.InsertLink and C_Map.GetUserWaypointHyperlink then
+        ChatFrameUtil.InsertLink(C_Map.GetUserWaypointHyperlink())
+    end
+    if SOUNDKIT and SOUNDKIT.UI_MAP_WAYPOINT_CHAT_SHARE then PlaySound(SOUNDKIT.UI_MAP_WAYPOINT_CHAT_SHARE) end
+    return true
+end
+
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("AREA_POIS_UPDATED")
@@ -1169,6 +1199,8 @@ ev:SetScript("OnEvent", function(_, event, a1)
         if WorldMapFrame then
             if WorldMapFrame.AcquirePin then hooksecurefunc(WorldMapFrame, "AcquirePin", OnAcquire) end
             if WorldMapFrame.RemoveAllPinsByTemplate then hooksecurefunc(WorldMapFrame, "RemoveAllPinsByTemplate", Released) end
+            -- ((1.8.2) the map pin's share while the pin is made under the map's taint - ShareClick above)
+            if WorldMapFrame.AddGlobalPinMouseActionHandler then WorldMapFrame:AddGlobalPinMouseActionHandler(ShareClick, 100) end
             -- ((1.6.0) a quest's details opened or closed in the quest log: the quests read again - ReadQuests' focus)
             for _, fn in ipairs({ "QuestMapFrame_ShowQuestDetails", "QuestMapFrame_CloseQuestDetails" }) do
                 if type(_G[fn]) == "function" then hooksecurefunc(fn, Dirty) end

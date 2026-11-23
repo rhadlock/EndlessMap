@@ -320,3 +320,21 @@ end
 function ns.WidthForZoom(v, e, z)
     return (e.x1 - e.x0) * v.lw0 * v.fit0 / (z * e.lw * ns.FitOf(v, e))
 end
+
+-- (1.8.2) The wheel's depth limit on WoW Forever and Classic Era: one zoom everywhere (Core.lua DepthAt, Render.lua's
+-- cave switch). The author on 1.8.2-beta2, the map stopped at 43.23x over the Wetlands (4.00x of its own map): "theres
+-- also all these random areas where the user cant zoom in any further. the max zoom should be uniform regardless of
+-- camera position." It was maxZoom past the deepest map under the cursor or the view's centre - at the default 4: 4.88x
+-- over Kalimdor's open sea, 17.72x in the Barrens, 43.23x in the Wetlands, 87.57x in Shen'dralas, 226.09x over
+-- Ironforge. Now the setting counts in steps of DEPTH_G world zoom, Ironforge's own fit (56.52x, the most detailed of
+-- the maps): the default 4 stops the wheel at 226.08x everywhere - as deep as it went over Ironforge, Ironforge's
+-- included. (Retail keeps maxZoom past the deepest map: its worlds lie in the Cosmic map at scales of their own.)
+ns.DEPTH_G = 56.52
+function ns.DepthZoom()
+    local d = ns.db and tonumber(ns.db.maxZoom)
+    return (d or 4) * ns.DEPTH_G
+end
+-- the view's width at that zoom
+function ns.DepthWidth(v)
+    return ns.WidthForZoom(v, ns.maps[ns.WORLD_MAP_ID], ns.DepthZoom())
+end

@@ -13,15 +13,18 @@ Everything is drawn in ONE frame, the holder: a child of Render's overlay on the
 parchment's world picture, which Render leaves out while the imagery shows (Render.lua Consider, dMM) - its textures
 ordered by draw layer, bottom to top:
   * the open sea, one flat colour over the whole view (the minimap has no pictures of the open sea)
-  * level 1-3, the composites (MinimapData.lua, tools/minimap/build_layer.py): 256 px pages of 16 / 32 / 64 px per ADT
-    tile (533 yd), DXT1 BLP2 with a full mip chain - the one add-on image format proven in this client (the layer test
+  * level 1-4, the composites (MinimapData.lua, tools/minimap/build_layer.py): 256 px pages of 16 / 32 / 64 / 128 px per
+    ADT tile (533 yd), DXT1 BLP2 with a full mip chain - the one add-on image format proven in this client (the layer test
     of 1.3.0-beta1: a palettized BLP crashed it). Level 1 (14 pages for both continents) is the backdrop: all of it,
-    always, loaded before the imagery takes over.
-  * level 4, the client's own 512 px minimap tiles (by fileDataID: no mips, so a shrunk tile shimmers): once each shows
-    at most CLIENT_IN texels per PHYSICAL screen pixel and no more than CLIENT_MAX of them are in view - and only with
+    always, loaded before the imagery takes over. (1.8.2) The 128 px level (328 pages): up to 1.8.1 the 64 px level was
+    the finest, stretched from 1 texel a screen pixel down to a quarter before the client tiles took over - a player's
+    report: "at 40x it clears up ... one more step to 23.66 it loses it" (0.37 texels a screen pixel there, a 4K screen);
+    now stretched at most twice.
+  * level 5 (CL), the client's own 512 px minimap tiles (by fileDataID: no mips, so a shrunk tile shimmers): once each
+    shows at most CLIENT_IN texels per PHYSICAL screen pixel and no more than CLIENT_MAX of them are in view - and only
     while "imageryTiles" is on (Options.lua, default on; /unroll imagerytiles): client minimap tiles by fileDataID are
-    what Dalaran's detail map and the caves have drawn since 1.0 (design rule 12). Without them the 64 px level serves at
-    every depth.
+    what Dalaran's detail map and the caves have drawn since 1.0 (design rule 12). Without them the 128 px level serves
+    at every depth.
   * the open sea's colour again, through each coastal tile's sea mask (Masks\sea_*.tga): the open sea of the client's
     tiles - its dark background, its blue water - and of the fogged composites in the one sea colour; and over every
     tile without land inside the backdrop's pages (merged into rectangles, no mask), which the fog would grey with its
@@ -81,6 +84,9 @@ local LEVEL_HYS = 1.25                    -- ... switching between the composite
 local CLIENT_IN, CLIENT_OUT = 2, 2.5      -- the client's tiles from at most 2 texels per physical px, until 2.5
 local CLIENT_MAX = 200                    -- ... and while at most this many of them (with a tile round the view) are in view
 local WIN_MARGIN, WIN_KEEP = 0.5, 0.15    -- a composite's window: the view grown by half its size; rebuilt at 15 %
+local FINE_MARGIN = 0.25                  -- (1.8.2) the 128 px level's: grown by a quarter (its pages a quarter the area)
+local FINE_MAX = 250                      -- (1.8.2) ... and only while at most this many of its pages (with a page round the
+                                          -- view) are in view - wider, the 64 px level (the textures' cap: I14, FI10)
 local FOG_MARGIN, FOG_KEEP = 0.25, 0.05   -- the fog's window (copies, sea quads): the view grown by a quarter; at 5 %
 local WIN_SHRINK = 1.6                    -- any window rebuilt once wider or taller than this many times what it needs
 local CLIENT_WIN, CLIENT_KEEP = 1, 0.25   -- the client tiles' window: a tile round the view; rebuilt at a quarter tile
@@ -89,13 +95,20 @@ local LEVEL_FADE = 0.2                    -- a level fades in / out over this
 local FOG_DESAT, FOG_DIM = 0.9, 0.6       -- unexplored land: desaturated this much, darkened to this
 local COARSE_LEVEL = 2                    -- (1.8.1) this level and the coarser ones: the fog's coarse masks (a zone explored
                                           -- whole through its cell, else each explored piece through its own mask)
-local MAX_TEX, MAX_MASKS = 4000, 2400     -- hard caps: the textures and masks this file ever makes - (1.8.1, the fog at every
+local MAX_TEX, MAX_MASKS = 8000, 2400     -- hard caps: the textures and masks this file ever makes - (1.8.1, the fog at every
                                           -- zoom) the imagery suite's peak 3132 / 1883 (I14: a 4K screen, the world view on
                                           -- the 64 px level - every explored tile of both continents -, after the 16 px
                                           -- level's piece masks); the masks there are at most the data's 937 tiles, 554
                                           -- pieces, 428 sea masks and a dozen cells (up to 1.8.0: 3000 / 1200, the fog from
-                                          -- continent zoom 2.5 only)
-local LAYERS = { "BACKGROUND", "BORDER", "ARTWORK", "OVERLAY" } -- level 1..4; base sublevel 0, copies 1
+                                          -- continent zoom 2.5 only). (1.8.2, the 128 px level: its pages a quarter the area,
+                                          -- its fog copies more) textures 8000: the pool's peak 7016 - an instant jump at
+                                          -- 4K, every zone explored, the level left and the new one both whole for a moment
+                                          -- (imageryflights FI11's setup); alive at once in a flight at most 3878, as 1.8.1
+-- (1.8.2) Five levels: the composites of 16, 32, 64 and 128 px per tile (NC), then the client's own tiles (CL) - each its
+-- draw layer and base sublevel, its copies one above that (the 128 px level and the client tiles share OVERLAY)
+local LAYERS = { { "BACKGROUND", 0 }, { "BORDER", 0 }, { "ARTWORK", 0 }, { "OVERLAY", 0 }, { "OVERLAY", 2 } }
+local NC = 4                              -- (1.8.2) the composite levels; the client tiles are the level after them
+local CL = NC + 1
 local SEA_SUB = 7                         -- the sea masks' colour quads: OVERLAY 7, above every level
 L.KEEP_CITY = { [1455] = true, [1458] = true } -- Ironforge, Undercity: underground, their city maps stay
 L.CLIENT_IN, L.CLIENT_OUT, L.CLIENT_MAX, L.MAX_TEX, L.MAX_MASKS = CLIENT_IN, CLIENT_OUT, CLIENT_MAX, MAX_TEX, MAX_MASKS
@@ -127,9 +140,11 @@ local seaStamp, pinHidden = nil, false
 local fogWin, fogWinGen = nil, 0          -- the fog's window (world-map px) and its builds
 local preview = {}                        -- key of the button's picture last set
 local cap = { tex = MAX_TEX, masks = MAX_MASKS } -- (the caps in force: the imagery suite lowers them for a while)
-for i, px in ipairs({ 16, 32, 64, CLIENT }) do
-    levels[i] = { i = i, px = px, n = (px == CLIENT) and 1 or 256 / px, layer = LAYERS[i], tex = {}, copies = {}, a = 0, gen = 0 }
+for i, px in ipairs({ 16, 32, 64, 128, CLIENT }) do
+    levels[i] = { i = i, px = px, n = (px == CLIENT) and 1 or 256 / px, layer = LAYERS[i][1], sub = LAYERS[i][2], tex = {}, copies = {},
+        a = 0, gen = 0 }
 end
+L.NC, L.CL = NC, CL
 
 ---------------------------------------------------------------------------
 -- Setup: the grids on the world map (ns.WorldPosToMap of two tiles' centres: each grid is affine on it)
@@ -201,10 +216,10 @@ local function Grids()
                 g.ax = x0 * W0 - g.bx * (p[1] + 0.5)
                 g.by = (y1 - y0) * H0 / (p[4] - p[2])
                 g.ay = y0 * H0 - g.by * (p[2] + 0.5)
-                for i = 1, 3 do g.pages[i] = Set(d.pages[levels[i].px]) end
+                for i = 1, NC do g.pages[i] = Set(d.pages[levels[i].px]) end
                 local t = d.tiles or {}
                 for k = 1, #t - 2, 3 do g.tiles[t[k + 1] * 64 + t[k]] = t[k + 2] end
-                g.pages[4] = g.tiles
+                g.pages[CL] = g.tiles
                 g.seaRects = SeaRects(g)
                 if g.bx > 0 and g.by > 0 then out[m] = g end
             end
@@ -233,7 +248,7 @@ local function CellsOver(g, lev, x0, y0, x1, y1)
 end
 
 local function FileOf(lev, m, key)
-    if lev.i == 4 then return grids[m].tiles[key] end
+    if lev.i == CL then return grids[m].tiles[key] end
     return D.path .. ("%d_%d_%d_%d.blp"):format(m, lev.px, key % 64, math.floor(key / 64))
 end
 
@@ -564,7 +579,7 @@ local function BuildWindow(lev, x0, y0, x1, y1)
     for k in pairs(want) do
         if not lev.tex[k] then
             local m, key = math.floor(k / 4096), k % 4096
-            local t = NewTex(lev.layer, 0)
+            local t = NewTex(lev.layer, lev.sub)
             if t then
                 local cx0, cy0, cx1, cy1 = CellRect(grids[m], lev, key % 64, math.floor(key / 64))
                 Put(t, FileOf(lev, m, key), cx0, cy0, cx1, cy1, cx0, cy0, cx1, cy1)
@@ -620,7 +635,7 @@ local function BuildCopies(lev)
             local x0, y0 = math.max(base.x0, T.ux0), math.max(base.y0, T.uy0)
             local x1, y1 = math.min(base.x1, T.ux1), math.min(base.y1, T.uy1)
             if x1 - x0 > 1e-3 and y1 - y0 > 1e-3 then
-                local c = NewTex(lev.layer, 1)
+                local c = NewTex(lev.layer, lev.sub + 1)
                 local mk = c and MaskFor(T)
                 if mk then
                     Put(c, base.file, x0, y0, x1, y1, base.x0, base.y0, base.x1, base.y1)
@@ -647,7 +662,7 @@ local function BuildSea()
     local want, wantR = {}, {}
     for m, g in pairs(grids) do
         if w and seaA[m] > 0 then
-            local c0, r0, c1, r1 = CellsOver(g, levels[4], w[1], w[2], w[3], w[4])
+            local c0, r0, c1, r1 = CellsOver(g, levels[CL], w[1], w[2], w[3], w[4])
             if c0 then
                 for r = r0, r1 do
                     for c = c0, c1 do
@@ -679,8 +694,8 @@ local function BuildSea()
             local m = math.floor(k / 4096)
             local q = NewTex("OVERLAY", SEA_SUB)
             if q then
-                local x0, y0 = CellRect(grids[m], levels[4], R[1], R[2])
-                local _, _, x1, y1 = CellRect(grids[m], levels[4], R[3], R[4])
+                local x0, y0 = CellRect(grids[m], levels[CL], R[1], R[2])
+                local _, _, x1, y1 = CellRect(grids[m], levels[CL], R[3], R[4])
                 q:SetColorTexture(sea[1], sea[2], sea[3], 1)
                 q:SetSize(x1 - x0, y1 - y0)
                 q:SetPoint("TOPLEFT", holder, "TOPLEFT", x0, -y0)
@@ -698,7 +713,7 @@ local function BuildSea()
             local c, r = key % 64, math.floor(key / 64)
             local q = NewTex("OVERLAY", SEA_SUB)
             if q then
-                local x0, y0, x1, y1 = CellRect(grids[m], levels[4], c, r)
+                local x0, y0, x1, y1 = CellRect(grids[m], levels[CL], c, r)
                 local mk = MaskFor({ key = ("sea:%d:%d:%d"):format(m, c, r), file = ("%ssea_%d_%d_%d.tga"):format(D.maskPath, m, c, r),
                     mx = x0, my = y0, mw = x1 - x0, mh = y1 - y0 })
                 if mk then
@@ -724,15 +739,18 @@ end
 ---------------------------------------------------------------------------
 -- Choosing the level
 ---------------------------------------------------------------------------
--- Client tiles with a tile round world-map px rect R: how many (the cap)?
-local function ClientCount(x0, y0, x1, y1)
+-- The cells of level lev - the client's tiles, or (1.8.2) a composite's pages - with one cell round world-map px rect R:
+-- how many there are (the caps CLIENT_MAX, FINE_MAX).
+local function CellCount(lev, x0, y0, x1, y1)
     local n = 0
     for _, g in pairs(grids) do
-        local c0, r0, c1, r1 = CellsOver(g, levels[4], x0 - g.bx * CLIENT_WIN, y0 - g.by * CLIENT_WIN, x1 + g.bx * CLIENT_WIN, y1 + g.by * CLIENT_WIN)
+        local bx, by = g.bx * lev.n, g.by * lev.n
+        local c0, r0, c1, r1 = CellsOver(g, lev, x0 - bx, y0 - by, x1 + bx, y1 + by)
         if c0 then
+            local have = g.pages[lev.i]
             for r = r0, r1 do
                 for c = c0, c1 do
-                    if g.tiles[r * 64 + c] then n = n + 1 end
+                    if have[r * 64 + c] then n = n + 1 end
                 end
             end
         end
@@ -743,15 +761,25 @@ end
 -- The level for physical px per ADT tile `adt` over rect R; cur: the level now (hysteresis).
 local function Pick(adt, cur, x0, y0, x1, y1)
     local d = CLIENT / adt
-    if L:TilesOn() and (d <= CLIENT_IN or (cur == 4 and d <= CLIENT_OUT)) and ClientCount(x0, y0, x1, y1) <= CLIENT_MAX then return 4 end
+    if L:TilesOn() and (d <= CLIENT_IN or (cur == CL and d <= CLIENT_OUT)) and CellCount(levels[CL], x0, y0, x1, y1) <= CLIENT_MAX then
+        return CL
+    end
     local want = adt * COMP_TEXELS
-    if cur and cur <= 3 and levels[cur].px * LEVEL_HYS >= want and (cur == 1 or levels[cur - 1].px < want * LEVEL_HYS) then
-        return cur
+    local i
+    if cur and cur <= NC and levels[cur].px * LEVEL_HYS >= want and (cur == 1 or levels[cur - 1].px < want * LEVEL_HYS) then
+        i = cur
+    else
+        i = NC
+        for k = 1, NC do
+            if levels[k].px >= want then
+                i = k
+                break
+            end
+        end
     end
-    for i = 1, 3 do
-        if levels[i].px >= want then return i end
-    end
-    return 3
+    -- (1.8.2) the 128 px level only while few enough of its pages are in view: wider, the 64 px level
+    if i == NC and CellCount(levels[NC], x0, y0, x1, y1) > FINE_MAX then i = NC - 1 end
+    return i
 end
 
 -- Physical screen px per container unit (the user's 4K screen at UI scale 0.64: 1.8).
@@ -767,12 +795,12 @@ end
 
 -- The window rect of level lev around world-map px rect R, and its keep test.
 local function Grown(lev, x0, y0, x1, y1, keep)
-    if lev.i == 4 then
+    if lev.i == CL then
         local g = grids[0] or grids[1]
         local k = keep and CLIENT_KEEP or CLIENT_WIN
         return x0 - g.bx * k, y0 - g.by * k, x1 + g.bx * k, y1 + g.by * k
     end
-    local k = keep and WIN_KEEP or WIN_MARGIN
+    local k = keep and WIN_KEEP or (lev.i == NC and FINE_MARGIN or WIN_MARGIN)
     local w, h = x1 - x0, y1 - y0
     return x0 - w * k, y0 - h * k, x1 + w * k, y1 + h * k
 end
@@ -847,7 +875,7 @@ end
 local function Alphas()
     local covered, backdrop, whole = true, true, true
     local v = view
-    for i = 1, 4 do
+    for i = 1, CL do
         local lev = levels[i]
         if lev.live then
             for _, t in pairs(lev.tex) do
@@ -1002,7 +1030,7 @@ end
 
 -- Everything released (the map closed 10 s ago, the imagery switched off): textures and masks keep no file.
 function L:Release()
-    for i = 1, 4 do ReleaseLevel(levels[i]) end
+    for i = 1, CL do ReleaseLevel(levels[i]) end
     for k, q in pairs(seaQ) do
         FreeTex(q)
         seaQ[k] = nil
@@ -1095,7 +1123,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
         if d ~= target then dest = d end
     end
     FogState()
-    local clientA = levels[4].live and levels[4].a or 0
+    local clientA = levels[CL].live and levels[CL].a or 0
     for m in pairs(grids) do seaA[m] = math.max(fl[m] or 0, clientA) end
     EnsureWindow(levels[1], view.x0, view.y0, view.x1, view.y1)
     EnsureFogWindow(view.x0, view.y0, view.x1, view.y1)
@@ -1105,7 +1133,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
     copyBudget, copiesShort = COPY_BUDGET, false
     BuildCopies(levels[target]) -- ((1.8.1) the backdrop's too, the world view's level: the fog at every zoom)
     BuildSea()
-    for i = 1, 4 do
+    for i = 1, CL do
         local lev = levels[i]
         if lev.live and i ~= target and (i == dest or (i > 1 and lev.a > 0)) then BuildCopies(lev) end
     end
@@ -1116,7 +1144,7 @@ function L:Draw(cam, v, ppx, ppy, host, pfvw, pfx0, pfy0, pfx1, pfy1)
     tl.a = math.min(1, tl.a + (active and dt / LEVEL_FADE or 1))
     local covered, backdrop, whole = Alphas()
     local busy = next(pending) ~= nil or next(fading) ~= nil or tl.a < 1 or copiesShort -- (1.3.0: copies still to make)
-    for i = 2, 4 do
+    for i = 2, CL do
         local lev = levels[i]
         if lev.live and i ~= target then
             if i > target and covered and i ~= dest then
@@ -1177,7 +1205,7 @@ function L:ZoomLines(out)
     if not L:On() then return end
     local t = target and levels[target]
     if not (t and view.adtPhys) then return end
-    local what = t.i == 4 and "the game's own minimap tiles" or ("composite %d px per tile"):format(t.px)
+    local what = t.i == CL and "the game's own minimap tiles" or ("composite %d px per tile"):format(t.px)
     out[#out + 1] = ("Minimap imagery: %s, %.2f texels per screen pixel; fog %.2f / %.2f (%s)"):format(what,
         t.px / view.adtPhys, fl[0] or 0, fl[1] or 0,
         L:TilesOn() and ("client tiles from %.1f"):format(CLIENT_IN) or "client tiles off: /unroll imagerytiles")
@@ -1191,7 +1219,7 @@ function L:Stats()
     s.seaRects = 0
     for _ in pairs(seaR) do s.seaRects = s.seaRects + 1 end
     for _ in pairs(masks) do s.masksLive = s.masksLive + 1 end
-    for i = 1, 4 do
+    for i = 1, CL do
         local lev, nb, nc = levels[i], 0, 0
         for _ in pairs(lev.tex) do nb = nb + 1 end
         for _ in pairs(lev.copies) do nc = nc + 1 end

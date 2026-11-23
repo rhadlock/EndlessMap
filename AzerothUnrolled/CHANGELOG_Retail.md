@@ -1,5 +1,11 @@
 # Changelog
 
+## Endless Map 1.8.2 - retail
+
+- **Keep the map solid while you move**. The game turns the map see-through whenever your character moves. Untick "Map fades while you move" in the map menu or on the Settings page (or /emap fade) and it stays solid; it is the game's own setting, kept for your account.
+- **Hear when a newer version is out**. Endless Map now tells the Endless Map of players in your guild and group which version it is (hidden add-on messages, nothing in chat). When one of them has a newer version, a line in chat says so, and again each time you log in or reload until you update. /emap version shows what it has heard; untick "Tell me when a newer version is out" on the Settings page (or /emap updates) to turn it off. It learns only from players who have this version or a later one.
+- **No "attempted to call a forbidden function (CopyToClipboard())" error when you share your map pin**. Shift-clicking your map pin to share it in chat also tries to copy a /mappin command, which the game refuses once Endless Map has moved the map, naming Endless Map. The pin's link now goes into chat without that copy, and without the error.
+
 ## Endless Map 1.8.1 - retail
 
 - **No "attempted to call a protected function (Button:SetPassThroughButtons())" error in combat**. With the map closed, the game still remakes the quest markers of the last map shown whenever the quest you track changes, and in a fight it refused one of their calls - naming Endless Map, which had moved the map. Endless Map now leaves the closed map on the world map, which has no quest markers to make; the map still opens on your zone.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Endless Map 1.8.2
+
+- **The same deepest zoom everywhere** (1.8.2-beta3). How far the mouse wheel zoomed in depended on the map under the cursor: over the open sea it stopped at 5x, in the Barrens at 18x, in the Wetlands at 43x, over Ironforge at 226x. It now goes in as far everywhere - as far as it went over Ironforge - and the Zoom depth setting sets that one depth (Shallow, Normal, Deep, Deepest). Zoomed in that deep near a capital, the map is no longer held on the city.
+- **Keep the map solid while you move** (1.8.2-beta3). The game turns the map see-through whenever your character moves. Untick "Map fades while you move" in the map menu or on the Settings page (or /unroll fade) and it stays solid; it is the game's own setting, kept for your account.
+- **Hear when a newer version is out** (1.8.2-beta3). Endless Map now tells the Endless Map of players in your guild and group which version it is (hidden add-on messages, nothing in chat). When one of them has a newer version, a line in chat says so, and again each time you log in or reload until you update. /unroll version shows what it has heard; untick "Tell me when a newer version is out" on the Settings page (or /unroll updates) to turn it off. It learns only from players who have this version or a later one.
+- **Sharper minimap imagery when zoomed in** (1.8.2-beta1). From about a zone's own view in, the imagery stretched its pictures up to four times before the game's own map tiles took over, so the map looked blurry there - on large screens most of all. A finer set of pictures now fills that range: stretched at most twice.
+- **No "attempted to call a forbidden function (CopyToClipboard())" error when you share your map pin** (1.8.2-beta2). Shift-clicking your map pin to share it in chat also tries to copy a /mappin command, which the game refuses once Endless Map has moved the map, naming Endless Map. The pin's link now goes into chat without that copy, and without the error.
+- **Coordinates for the zone you point at** (1.8.2-beta1). The coordinates at the map's lower left showed the continent's numbers when zoomed out, and one zone's numbers while you pointed at another. They now always give the zone or city under the cursor, with its name when it isn't the map shown, and your own zone's for you.
+
 ## Endless Map 1.8.1
 
 - **No "attempted to call a protected function (Button:SetPassThroughButtons())" error in combat** (1.8.1-beta1). With the map closed, the game still remakes the quest markers of the last map shown whenever the quest you track changes, and in a fight it refused one of their calls - naming Endless Map, which had moved the map. Endless Map now leaves the closed map on the world map, which has no quest markers to make; the map still opens on your zone.

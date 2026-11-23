@@ -2,7 +2,7 @@
 ## Title: Endless Map
 ## Notes: One smooth zoom over the whole world map, from Azeroth down to a dungeon door, with dungeon and raid maps, bosses and entrances. Settings: the round button on the map, or /endlessmap.
 ## Author: Hadlock
-## Version: 1.8.1
+## Version: 1.8.2
 ## SavedVariables: AzerothUnrolledDB
 ## X-License: GPL-3.0-or-later
 ## IconTexture: Interface\AddOns\AzerothUnrolled\Media\icon
@@ -20,6 +20,7 @@ Render.lua
 Labels.lua
 Core.lua
 ZoomReadout.lua
+MapCoords.lua
 HighlightGuard.lua
 MinimapData.lua
 FogMaskData.lua
@@ -48,6 +49,7 @@ Portals.lua
 Options.lua
 ChangesData.lua
 Share.lua
+UpdateNotice.lua
 MapMenu.lua
 MapWindow.lua
 OptionsPanel.lua

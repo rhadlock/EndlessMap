@@ -119,9 +119,17 @@ Add({ key = "zoomStep", kind = "num", cmd = "step", lo = 1.05, hi = 2, label = "
     tip = "How much one notch of the mouse wheel zooms.",
     said = function(v) return ("zoom per wheel notch: %gx"):format(v) end,
     presets = { { 1.15, "Fine" }, { 1.3, "Normal" }, { 1.5, "Fast" }, { 2, "Fastest" } } })
+-- (1.8.2) WoW Forever and Classic Era: one depth everywhere, in steps of ns.DEPTH_G world zoom (Util.lua); retail: past
+-- the deepest map, as before
 Add({ key = "maxZoom", kind = "num", cmd = "depth", lo = 1, hi = 10, label = "Zoom depth", unit = "x",
-    tip = "How far past a zone's own map you can zoom in.",
-    said = function(v) return ("you can now zoom %gx past a zone's normal size"):format(v) end,
+    tip = ns.FLAVOR == "retail" and "How far past a zone's own map you can zoom in."
+        or ("How far in the mouse wheel goes - the same everywhere. Normal (4): zoom %.0fx (1x = the whole world map)."):format(4 * ns.DEPTH_G),
+    said = function(v)
+        if ns.FLAVOR == "retail" then return ("you can now zoom %gx past a zone's normal size"):format(v) end
+        return ("the wheel now stops at zoom %.0fx, everywhere"):format(v * ns.DEPTH_G)
+    end,
+    -- (the menus: "Normal (226x, default)" - the zoom it stops at, as the zoom readout counts)
+    show = ns.FLAVOR ~= "retail" and function(v) return ("%.0fx"):format(v * ns.DEPTH_G) end or nil,
     presets = { { 2, "Shallow" }, { 4, "Normal" }, { 6, "Deep" }, { 10, "Deepest" } } })
 Add({ key = "flySpeed", kind = "num", cmd = "speed", lo = 0.25, hi = 4, label = "Flight speed", unit = "x",
     tip = "The speed of the flight to another map (a click on a zone, the quest log).",
@@ -185,6 +193,10 @@ end
 -- the window; its own box and the Settings page switch it)
 Add({ key = "newsAfterUpdate", kind = "bool", label = "What's new after an update", said = "what's new after an update ",
     tip = "The first time you open the map after Endless Map updated: a window with what changed, the link to share it and a button to report a bug." })
+-- (1.8.2, UpdateNotice.lua) a newer version heard from the guild and the group: a line in chat at login and reload
+Add({ key = "updateNotice", kind = "bool", cmd = "updates", label = "Tell me when a newer version is out",
+    said = "the line about a newer version ",
+    tip = "Endless Map tells the Endless Map of players in your guild and group which version you have (hidden add-on messages, no chat). When one of them has a newer version: a line in chat, and again each time you log in or reload until you update. Off: nothing sent, nothing said." })
 
 -- (1.3.0, PartyBubbles.lua) you and your party in round bubbles under the map's top left button
 Add({ key = "bubbles", kind = "bool", cmd = "bubbles", label = "Party bubbles", said = "party bubbles on the map ",
@@ -242,6 +254,20 @@ Add({ key = "mapWindow", kind = "bool", cmd = "window", label = "Move and size t
     said = "moving and sizing the map window ",
     apply = function() if ns.MapWindow then ns.MapWindow:Apply() end end })
 
+-- (1.8.2) The map fading while you move. The author: "a toggle to disable the map transparency engaging when you move.
+-- normally if map is open, any time you move, that pane goes transparent. a button to disable that would be great." The
+-- game's own setting: Blizzard's map fades while you move only while the CVar mapFade is on (Blizzard_WorldMap.lua:
+-- PlayerMovementFrameFader.AddDeferredFrame(self, .5, 1.0, .5, function() return GetCVarBool("mapFade") and not
+-- self:IsMouseOver() end) - WoW Forever and retail alike), and WoW Forever's own options do not show it. This switch is
+-- that CVar: the game keeps it, for the account - nothing of it in Endless Map's saved file, a reset leaves it. Where the
+-- client has no such CVar: left out.
+local function FadeCVar() return GetCVar ~= nil and GetCVar("mapFade") ~= nil end
+Add({ key = "mapFade", kind = "bool", cmd = "fade", label = "Map fades while you move", avail = FadeCVar, default = true,
+    tip = "The map turns see-through while you move, as the game does. Off: it stays solid. The game's own setting (mapFade), kept for your account.",
+    said = "the map fading while you move ",
+    get = function() return GetCVarBool ~= nil and GetCVarBool("mapFade") == true end,
+    set = function(_, _, on) if FadeCVar() and SetCVar then SetCVar("mapFade", on and "1" or "0") end end })
+
 Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the map",
     tip = "The round settings, caves and imagery buttons in the map's lower right corner.", -- (1.3.0: + imagery)
     said = function(on)
@@ -254,6 +280,7 @@ Add({ key = "mapButton", kind = "bool", cmd = "button", label = "Buttons on the 
 local OWN_DEFAULTS = { placeNames = true, dungeonIcons = true, mapButton = true, bubbles = true, imagery = false, imageryTiles = true, -- (1.3.0: + bubbles, imagery, imageryTiles)
     questZoom = QG, -- (1.6.0; nil where Pins.lua is not - Classic Era)
     newsAfterUpdate = true, -- (1.6.1)
+    updateNotice = true, -- (1.8.2)
     mapWindow = true, -- (1.7.0)
     imageryBlend = 100 } -- (1.8.0)
 if ns.DEFAULTS then
@@ -268,7 +295,9 @@ function O:List() return LIST end
 function O:Default(key)
     local d = ns.DEFAULTS
     if d and d[key] ~= nil then return d[key] end
-    return OWN_DEFAULTS[key]
+    if OWN_DEFAULTS[key] ~= nil then return OWN_DEFAULTS[key] end
+    local s = SPEC[key]
+    return s and s.default -- ((1.8.2) a setting the game keeps, not the saved file: the game's own default - mapFade)
 end
 
 function O:Get(key)
@@ -355,6 +384,7 @@ function O:Help()
         Say(c .. " button          show or hide the buttons on the map (settings, caves, imagery)")
         Say(c .. " window          toggle moving and sizing the map window (drag its title bar / its corner grip); window reset: the game's place and size")
         Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
+        if FadeCVar() then Say(c .. " fade            toggle the map fading while you move (the game's own setting)") end
         Say(c .. " cavezoom N      the world zoom the caves show from (default 30, off: never)")
         Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
         Say(c .. " blend <N>       how much of the imagery shows over the drawn map, 5 - 100 percent (the imagery button's slider)")
@@ -362,6 +392,8 @@ function O:Help()
         Say(c .. " news            what's new in this version, with the download link to copy and share")
         Say(c .. " link            the download link, in your own chat (only you see it)")
         Say(c .. " bug             a bug report to copy (versions, settings, errors) and where to paste it")
+        Say(c .. " updates         toggle the line in chat when a player in your guild or group has a newer version")
+        Say(c .. " version         this copy's version and the newest heard from your guild and group")
         return
     end
     Say(c .. " names | icons   toggle place names / dungeon and raid icons on the map")
@@ -371,6 +403,7 @@ function O:Help()
         Say(c .. " window          toggle moving and sizing the map window (drag its title bar / its corner grip); window reset: the game's place and size")
     end
     Say(c .. " bubbles         toggle the party bubbles in the map's top left corner (click one: go to them and follow)")
+    if FadeCVar() then Say(c .. " fade            toggle the map fading while you move (the game's own setting)") end
     Say(c .. " imagery         toggle the minimap imagery: the map drawn from the game's minimap pictures (default off)")
     if Imagery() then
         Say(c .. " blend <N>       how much of the imagery shows over the drawn map, 5 - 100 percent (the imagery button's slider)")
@@ -378,4 +411,6 @@ function O:Help()
     Say(c .. " news            what's new in this version, with the download link to copy and share")
     Say(c .. " link            the download link, in your own chat (only you see it)")
     Say(c .. " bug             a bug report to copy (versions, settings, errors) and where to paste it")
+    Say(c .. " updates         toggle the line in chat when a player in your guild or group has a newer version")
+    Say(c .. " version         this copy's version and the newest heard from your guild and group")
 end

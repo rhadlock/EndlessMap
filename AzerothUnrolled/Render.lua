@@ -145,7 +145,8 @@ zoom 30; 52 in a beta) and the deepest zoom the wheel reaches over the
 cave (CaveSwitch: Core's depth limit, maxZoom past the deepest map at the cave's
 centre - at the default depth less than 30x for 34 caves in 5 zones, from
 Winterspring's 25.28x to Mulgore's 29.17x), so every cave shows, at the deepest
-zoom over it at most.
+zoom over it at most. (1.8.2: the depth is one zoom everywhere - ns.DepthZoom,
+226.08x at the default -, so every cave switches at the cave zoom.)
 The caves around several instance portals (Maraudon, the Scarlet Monastery) and
 the Timbermaw Hold tunnels go with the city maps, as Gnomeregan does (Caves.lua:
 no gate).
@@ -1030,8 +1031,6 @@ local function DetailEntry(def)
         tiles = c.t, blocks = c.blocks, tint = c.tint, rimC = c.rim, gate = def.gate, -- (1.2.0: Caves.lua)
     }
     ns.SetStretch(e)
-    -- (1.2.0) a cave: the map the wheel's depth limit over it counts from (CaveSwitch)
-    if def.gate == "cave" then e.deepMap = ns.DeepestMapAt(e.cx, e.cy) end
     -- the level drawn under it: its rect the same way
     local u = def.under
     local uc = u and (u.art or (ns.DUNGEON_CAVES and ns.DUNGEON_CAVES[u.cave])) -- (1.2.0: or its own grid)
@@ -1723,18 +1722,12 @@ local function UseCells()
     return ns.db == nil or (ns.db.cells ~= false and ns.db.mosaic ~= false)
 end
 
--- (1.2.0) The caves' switch where the deepest map is m (a cave's: e.deepMap): the cave zoom, or the deepest world zoom
--- the wheel reaches there where that is less (Core's depth limit: maxZoom past the deepest map at a point); nil while
--- the caves are off. The limits by map, for the frame (deepZ: CityFades wipes it).
-local deepZ = {}
-local function CaveSwitch(m, v)
+-- (1.2.0) The caves' switch: the cave zoom, or the deepest world zoom the wheel reaches where that is less; nil while
+-- the caves are off. (1.8.2: that depth is one zoom everywhere - ns.DepthZoom, Util.lua; before, maxZoom past the
+-- deepest map at the cave, less than 30x for 34 caves in 5 zones)
+local function CaveSwitch()
     if not caveG then return nil end
-    local z = deepZ[m]
-    if not z then
-        z = ns.WorldZoom(v, ns.WidthForZoom(v, m, ns.db and ns.db.maxZoom or 4))
-        deepZ[m] = z
-    end
-    return math.min(caveG, z)
+    return math.min(caveG, ns.DepthZoom())
 end
 
 -- City detail: each city's patch - a capital's, a detail level's (Dalaran,
@@ -1781,7 +1774,6 @@ local function CityFades(ddt)
     local step = ddt and math.min(1, ddt / CITY_FADE) or 1
     local cap = ddt and math.min(1, ddt / CITY_FADE_MIN) or 1
     local zOut = Render.CityOut()
-    wipe(deepZ)
     local wz, wzPf = ns.WorldZoom(dv, dcam.vw), pfvw and ns.WorldZoom(dv, pfvw)
     for cid, h in pairs(homeOfCity) do
         -- (1.2.0) a cave (Caves.lua) by its own switch, hidden just below it whatever the city rule
@@ -1789,7 +1781,7 @@ local function CityFades(ddt)
         local cave = e ~= nil and e.gate == "cave"
         local z, zPf -- (zPf: where a zoom in is heading)
         if cave then
-            local g = CaveSwitch(e.deepMap, dv)
+            local g = CaveSwitch()
             z = g and CITY_IN * wz / g or 0
             zPf = pfvw and (g and CITY_IN * wzPf / g or 0)
         else
@@ -2576,7 +2568,7 @@ function Render:ZoomLines(cam, v, out)
                 local name = (c.name and c.name ~= "") and c.name or tostring(cid)
                 local state = cityOn[cid] and "SHOWN" or "hidden"
                 if c.gate == "cave" then
-                    local g = CaveSwitch(c.deepMap, v) -- (1.2.0: its own switch where the wheel stops short of the cave zoom)
+                    local g = CaveSwitch() -- (1.2.0: its own switch where the wheel stops short of the cave zoom)
                     caves[#caves + 1] = g and g < caveG and ("%s: cave %s  (from %.2fx)"):format(name, state, g)
                         or ("%s: cave %s"):format(name, state)
                     if cityOn[cid] then shown = shown + 1 end
@@ -2600,10 +2592,13 @@ function Render:ZoomLines(cam, v, out)
         end
     end
     if ns.MinimapLayer then ns.MinimapLayer:ZoomLines(out) end -- (1.3.0)
+    -- (1.8.2) the wheel's depth: one zoom everywhere (Util.lua ns.DepthZoom)
+    out[#out + 1] = ("The wheel stops at zoom %.2fx, everywhere (depth %g)  -  /unroll depth <1-10>"):format(
+        ns.DepthZoom(), ns.db and tonumber(ns.db.maxZoom) or 4)
     -- (1.2.0) the caves' switch (before the city rule, which stays the last line); where the wheel stops short of
-    -- it at the view's centre, the deepest zoom there
+    -- it, the deepest zoom
     if caveG then
-        local here = CaveSwitch(ns.DeepestMapAt(cam.x, cam.y), v)
+        local here = CaveSwitch()
         out[#out + 1] = ("Caves show above zoom %.2fx (hide below %.2fx)%s  -  /unroll cavezoom <N> | default | off"):format(
             caveG, caveG * Render.CITY_G_HIDE, here < caveG and ("; here from %.2fx, the deepest zoom"):format(here) or "")
     else

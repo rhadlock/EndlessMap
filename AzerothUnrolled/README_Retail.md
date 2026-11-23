@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.8.1 - for **retail World of Warcraft** (12.1.5, interface 120105).
+Version 1.8.2 - for **retail World of Warcraft** (12.1.5, interface 120105).
 
 One smooth zoom over the whole world map. Open the map and you are in space, on Blizzard's map of the worlds; scroll
 into any world, any continent, through the small inset maps (Argus, the Maelstrom, Nazjatar, ...) down to the centre
@@ -71,6 +71,7 @@ slash command.
 | `/emap openfollow` | M also follows you: on / off (default on) |
 | `/emap window` | moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/emap window reset`: the game's place and size again |
 | `/emap bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
+| `/emap fade` | the game's fade of the map while you move: on / off (the game's own setting, on by default) |
 | `/emap imagery` | the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/emap blend <N>` | how much of the minimap imagery shows over the drawn map, 5 - 100 percent (default 100: the imagery alone) - the imagery button's slider sets it too |
 | `/emap imagerytiles` | the minimap imagery's closest zoom from the game's own minimap tiles: on / off (default on) |
@@ -78,6 +79,8 @@ slash command.
 | `/emap link` | the download link in your own chat window (only you see it) |
 | `/emap news` | what's new in this version - the window that opens by itself the first time the map opens after an update - with the download link to copy and share |
 | `/emap bug` | a bug report to copy - versions, settings, the add-on's errors - and paste in Endless Map's bug form on GitHub |
+| `/emap updates` | the line in chat when a player in your guild or group has a newer Endless Map - at once, then at each login and reload until you update: on / off (default on); hidden add-on messages tell their copies your version |
+| `/emap version` | this copy's version, the newest heard from your guild and group, the copies heard this session |
 | `/emap taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/emap debug` | how the map layers are stacked (for bug reports) |
 | `/emap why` | what the map shows here and why - kept in the saved settings too (for bug reports) |

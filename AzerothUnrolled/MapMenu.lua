@@ -65,7 +65,7 @@ local ART_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local ART_TOGGLE = "Interface\\Minimap\\UI-Minimap-ZoomButton-Toggle" -- (1.3.0: the map-pin button's ActiveTexture, Blizzard_WorldMapTemplates.xml:49-55)
 
 -- The menu, top to bottom.
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapWindow" } -- (1.3.0: + bubbles, imagery; 1.7.0: + mapWindow)
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapWindow", "mapFade" } -- (1.3.0: + bubbles, imagery; 1.7.0: + mapWindow; 1.8.2: + mapFade)
 local ZOOM = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 
 local S = {} -- button, icon, caves, cavesIcon, layer, layerIcon, layerGlow, tip, tipText, dropdown (true: Blizzard's menu)
@@ -102,7 +102,8 @@ end
 
 -- "Normal (1.3x, default)" / "By each city's zone (default)" / "Custom (1.41x)"
 local function ValueText(s, value, name, isDefault)
-    local num = (type(value) == "number") and (("%g"):format(value) .. (s.unit or "")) or nil
+    -- ((1.8.2) s.show: the value in the words a setting shows it in - the zoom depth as the zoom it stops at)
+    local num = (type(value) == "number") and (s.show and s.show(value) or (("%g"):format(value) .. (s.unit or ""))) or nil
     if num and isDefault then return ("%s (%s, default)"):format(name, num) end
     if num then return ("%s (%s)"):format(name, num) end
     return isDefault and (name .. " (default)") or name

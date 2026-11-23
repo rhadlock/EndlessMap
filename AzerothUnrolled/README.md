@@ -1,6 +1,6 @@
 # Endless Map
 
-Version 1.8.1 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
+Version 1.8.2 - for **WoW Forever** (client 1.60.1, interface 16001). It also loads on **Classic Era**
 (1.15.8 / 1.15.9, interfaces 11508 / 11509); everything marked *Forever* below is switched off there.
 
 **Retail** (12.1.5, interface 120105) has its own download: the folder `EndlessMap`, the commands
@@ -125,11 +125,12 @@ on the map", to bring hidden buttons back), and every one of them has a slash co
 | Party bubbles | you and your party (in a raid: your group) in the map's top left corner: hover for their zone, click to go to them and follow them |
 | Minimap imagery | *Forever:* the map drawn from the game's own minimap pictures instead of the drawn map; unexplored land greyed (off by default) |
 | Zoom readout | the zoom numbers in the map's top left corner |
+| Map fades while you move | the game's own fade of the map while your character moves: untick it and the map stays solid (the game's setting, kept for your account) |
 | Zoom > Wheel step | zoom per wheel notch: 1.15x, 1.3x (default), 1.5x, 2x |
-| Zoom > Zoom depth | how far past a zone's own map: 2x, 4x (default), 6x, 10x |
+| Zoom > Zoom depth | *Forever:* how far in the wheel goes, the same everywhere: world zoom 113x, 226x (default - as deep as Ironforge's own map allowed before), 339x, 565x; *retail:* how far past a zone's own map: 2x, 4x (default), 6x, 10x |
 | Zoom > Flight speed | 0.5x, 1x (default), 2x, 4x |
 | Zoom > City maps appear | from world zoom 10x, 14.05x (default) or 20x, or by each city's own zone |
-| Zoom > Caves appear | from world zoom 20x, 30x (default) or 40x - where the map stops short of that, at its deepest zoom over the cave -, or never |
+| Zoom > Caves appear | from world zoom 20x, 30x (default) or 40x - where the wheel stops short of that, at its deepest zoom -, or never |
 | Zoom > M opens the map on me | at world zoom 10x, 14x (default) or 20x on your character, or off (the game's view) |
 | Slash commands | prints every command to the chat |
 | Reset to defaults | every setting back to its default (learned doors are kept) |
@@ -146,7 +147,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | Command | What it does |
 |---|---|
 | `/unroll on`, `/unroll off` | the smooth zoom on / off (Blizzard's map as usual when off) |
-| `/unroll depth <1-10>` | how far past a zone's own map you can zoom (default 4) |
+| `/unroll depth <1-10>` | how far in the wheel goes: *Forever* the same everywhere, 56.52x world zoom a step (default 4: 226x); *retail* past a zone's own map (default 4) |
 | `/unroll step <1.05-2>` | zoom per wheel notch (default 1.3) |
 | `/unroll portals` | the markers of the boats, zeppelins, skycutters, portals and the tram on / off (default on) |
 | `/unroll speed <0.25-4>` | speed of the map's flights - a click on a zone, a party bubble, following someone through a portal (default 1) |
@@ -170,6 +171,7 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll openfollow` | M also follows you: on / off (default on) |
 | `/unroll window` | *Forever:* moving and sizing the map window: on / off (default on) - drag its title bar to move it, the grip at its lower right corner to size it; `/unroll window reset`: the game's place and size again |
 | `/unroll bubbles` | the party bubbles in the map's top left corner: on / off (default on) |
+| `/unroll fade` | the game's fade of the map while you move: on / off (the game's own setting, on by default) |
 | `/unroll imagery` | *Forever:* the minimap imagery - the map drawn from the game's minimap pictures: on / off (default off) |
 | `/unroll blend <N>` | *Forever:* how much of the minimap imagery shows over the drawn map, 5 - 100 percent (default 100: the imagery alone) - the imagery button's slider sets it too |
 | `/unroll cavezoom <N>`, `default`, `off` | the world zoom from which caves show their tunnels: 10 to 60, default 30 (where the map stops short of it, at its deepest zoom over the cave); off = never |
@@ -177,6 +179,8 @@ works) or with the short form `/unroll`, as written below; `/emap` (1.4.0) and t
 | `/unroll link` | the download link in your own chat window (only you see it) |
 | `/unroll news` | what's new in this version - the window that opens by itself the first time the map opens after an update - with the download link to copy and share |
 | `/unroll bug` | a bug report to copy - versions, settings, the add-on's errors - and paste in Endless Map's bug form on GitHub |
+| `/unroll updates` | the line in chat when a player in your guild or group has a newer Endless Map - at once, then at each login and reload until you update: on / off (default on); hidden add-on messages tell their copies your version |
+| `/unroll version` | this copy's version, the newest heard from your guild and group, the copies heard this session |
 | `/unroll taint` | checks that the objective tracker's quest data is clean (for bug reports) |
 | `/unroll debug` | how the map layers are stacked (for bug reports) |
 | `/unroll reset` | settings back to their defaults (learned doors are kept) |

@@ -39,7 +39,7 @@ if ns.inert then return end -- (1.3.1: another copy of the add-on runs - OneCopy
 
 local DEFAULTS = {
     enabled = true,
-    maxZoom = 4,         -- how far past a zone's normal size you can zoom in
+    maxZoom = 4,         -- how far in the wheel goes: WoW Forever in steps of ns.DEPTH_G world zoom, the same everywhere (1.8.2); retail past the deepest map
     zoomStep = 1.3,      -- zoom factor per mouse-wheel notch
     labels = true,       -- show important places
     labelsAtRest = true, -- keep them on the map when it isn't moving
@@ -965,7 +965,18 @@ local function FocusZoneAt(x, y, contID)
     return id
 end
 
--- Depth confinement. A capital's map is far more detailed than its zone's
+-- (1.8.2) The narrowest view the wheel reaches with world-map point (x, y) under the cursor or at the view's centre.
+-- WoW Forever and Classic Era: one depth everywhere (ns.DepthWidth - the author: "the max zoom should be uniform
+-- regardless of camera position"). Retail: maxZoom past the deepest map there - over open space the Cosmic map's own
+-- (no diving into empty space).
+local function DepthAt(x, y)
+    if ns.FLAVOR ~= "retail" then return ns.DepthWidth(v) end
+    local D = DeepestAt(x, y)
+    return ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom)
+end
+
+-- Depth confinement (retail; 1.8.2: not on WoW Forever and Classic Era, where the depth is the same everywhere and no
+-- zone has a limit of its own - DepthAt, CityLimit). A capital's map is far more detailed than its zone's
 -- (Ironforge ~6x Dun Morogh, Stormwind 2x Elwynn), so the wheel goes deeper
 -- over the city (DeepestAt) - but past the zone's own depth limit (maxZoom
 -- past the zone's fit) the land around the city only exists as the zone's
@@ -981,8 +992,9 @@ end
 local DEPTH_RAMP = 1.69 -- (two wheel notches at the default step)
 local depthCity         -- the capital the view is kept on, or nil
 
--- View width at the depth limit of a capital's own zone (nil: none known).
+-- View width at the depth limit of a capital's own zone (nil: none known; 1.8.2: none on WoW Forever and Classic Era).
 local function CityLimit(C)
+    if ns.FLAVOR ~= "retail" then return nil end
     local home = HomeZone(C)
     return home and ns.WidthForZoom(v, home, db.maxZoom)
 end
@@ -1605,8 +1617,7 @@ local function FollowFarFree(fx, fy)
     if ex * ex + ey * ey <= 4 * (v.W * v.W + v.H * v.H) then return false end
     local w = math.min(targetVw, 1)
     if w < cam.vw then
-        local D = DeepestAt(fx, fy)
-        w = math.max(w, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), cam.vw)) -- (1.4.0: D.maxZoom, retail)
+        w = math.max(w, math.min(DepthAt(fx, fy), cam.vw)) -- (1.4.0: D.maxZoom, retail; 1.8.2: DepthAt)
     end
     local vw0 = cam.vw
     if not FollowFar(fx, fy, true) then return false end
@@ -1615,8 +1626,7 @@ local function FollowFarFree(fx, fy)
         -- deeper than the wheel may go there
         local L = math.min(fly.target.vw * w / vw0, 1)
         if L < fly.target.vw then
-            local D = DeepestAt(fx, fy)
-            L = math.max(L, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), fly.target.vw))
+            L = math.max(L, math.min(DepthAt(fx, fy), fly.target.vw))
         end
         fly.zoomF = L / fly.target.vw
         return true
@@ -1919,8 +1929,7 @@ local function WheelInFlight(f, delta)
     local w0 = f.target.vw * f.zoomF
     local w = w0 / (db.zoomStep ^ delta)
     if delta > 0 then
-        local D = DeepestAt(f.target.x, f.target.y)
-        w = math.max(w, math.min(ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom), w0)) -- (1.4.0: D.maxZoom, retail)
+        w = math.max(w, math.min(DepthAt(f.target.x, f.target.y), w0)) -- (1.4.0: D.maxZoom, retail; 1.8.2: DepthAt)
     end
     f.zoomF = math.min(w, 1) / f.target.vw
     lastInput = GetTime()
@@ -2043,13 +2052,12 @@ local function OnMouseWheel(_, delta)
 
     local newT = targetVw / (db.zoomStep ^ delta)
     if delta > 0 then
-        -- Depth limit: maxZoom past the deepest map under the cursor (or the
-        -- centre). Only ever stops further zooming in, never pushes you out.
+        -- Depth limit (DepthAt): WoW Forever one zoom everywhere (1.8.2); retail maxZoom past the deepest map under the
+        -- cursor (or the centre). Only ever stops further zooming in, never pushes you out.
         local floor = math.huge
         for i = 1, #points, 2 do
             -- (1.4.0, retail: a map's own limit - the Cosmic map's over open space, RetailSpace.lua)
-            local D = DeepestAt(points[i], points[i + 1])
-            floor = math.min(floor, ns.WidthForZoom(v, D, D.maxZoom or db.maxZoom))
+            floor = math.min(floor, DepthAt(points[i], points[i + 1]))
         end
         newT = math.max(newT, math.min(floor, targetVw))
         -- (deeper than a capital's zone goes: the view is kept on the city - not while following, 1.3.0)
@@ -2308,6 +2316,17 @@ local function ExportCore()
         Cam = function() return cam, v end, -- (1.0.0, ZoomReadout.lua)
         -- (1.1.0, Follow.lua)
         CursorPos = CursorPos,
+        -- ((1.8.2) MapCoords.lua) the world map's point under the cursor (Endless Map's view, not Blizzard's map), and
+        -- the zone or city there (the game's own hit areas: C_Map.GetMapInfoAtPosition) - nil over no zone
+        CursorWorld = function()
+            if not UpdateView() then return nil end
+            local sx, sy = CursorPos()
+            return ScreenToWorldWith(cam, sx, sy)
+        end,
+        ZoneAtPoint = function(x, y)
+            local c = ContinentAt(x, y)
+            return c and ZoneAt(x, y, c) or nil
+        end,
         -- ((1.6.3, Pins.lua) a click on the frame that takes the mouse for a marker: a click on the map there - the
         -- canvas's click handler's rules, OurClick's order)
         Click = function(button) return OnCanvasClick(nil, button) end,
@@ -2575,6 +2594,8 @@ SlashCmdList[ns.SLASH] = function(input)
         end
     elseif cmd == "link" or cmd == "news" or cmd == "bug" then -- (1.6.1, Share.lua)
         if ns.Share then ns.Share:Slash(cmd) else Print(cmd .. ": not available") end
+    elseif cmd == "version" then -- (1.8.2, UpdateNotice.lua)
+        if ns.UpdateNotice then ns.UpdateNotice:Status() else Print("version: not available") end
     elseif cmd == "follow" or cmd == "openzoom" or cmd == "openfollow" then
         if ns.Follow then ns.Follow:Slash(cmd, num, Print, arg) else Print(cmd .. ": not available") end
     elseif cmd == "taint" then
@@ -2657,7 +2678,8 @@ SlashCmdList[ns.SLASH] = function(input)
         local C = ns.COMMAND
         Print(("/endlessmap <command> always works; %s <command> is the short form:"):format(C))
         Print(C .. " on | off")
-        Print(C .. " depth <1-10>   how far past a zone you can zoom")
+        Print(C .. (ns.FLAVOR == "retail" and " depth <1-10>   how far past a zone you can zoom"
+            or " depth <1-10>   how far in the wheel goes, the same everywhere")) -- (1.8.2)
         Print(C .. " step <1.05-2>  zoom per wheel notch")
         Print(C .. " speed <0.25-4> click flight speed")
         -- (1.4.0) on retail only the lines of what it has there: no mosaic, cells, dungeon maps, markers, bosses, doors,

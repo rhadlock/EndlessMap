@@ -19,13 +19,14 @@ local P = {}
 ns.OptionsPanel = P
 
 local TITLE = ns.TITLE or "Endless Map" -- (Options.lua)
-local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapButton", -- (1.3.0: + bubbles, imagery)
-    "newsAfterUpdate" } -- (1.6.1: Share.lua's What's new)
+local TOGGLES = { "enabled", "placeNames", "dungeonIcons", "doorHints", "dungeons", "bosses", "livePins", "follow", "openFollow", "bubbles", "imagery", "zoomReadout", "mapFade", "mapButton", -- (1.3.0: + bubbles, imagery; 1.8.2: + mapFade)
+    "newsAfterUpdate", "updateNotice" } -- (1.6.1: Share.lua's What's new; 1.8.2: UpdateNotice.lua)
 local CHOICES = { "zoomStep", "maxZoom", "flySpeed", "cityZoom", "caveZoom", "questZoom", "openZoom" } -- (1.6.0: + questZoom)
 local NONE = 0 -- (a dropdown value must be a number: stands for cityZoom = false)
 
 local function PresetText(s, value, name, isDefault)
-    local num = (type(value) == "number") and (("%g"):format(value) .. (s.unit or "")) or nil
+    -- ((1.8.2) s.show: the value in the words a setting shows it in - the zoom depth as the zoom it stops at)
+    local num = (type(value) == "number") and (s.show and s.show(value) or (("%g"):format(value) .. (s.unit or ""))) or nil
     local text = num and ("%s (%s)"):format(name, num) or name
     return isDefault and (text .. " - default") or text
 end
